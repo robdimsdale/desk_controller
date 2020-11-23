@@ -7,4 +7,4 @@ set -o xtrace
 
 readonly TARGET_ARCH=armv7-unknown-linux-gnueabihf
 
-cross build --release --target=${TARGET_ARCH}
+cross build --target=${TARGET_ARCH}
