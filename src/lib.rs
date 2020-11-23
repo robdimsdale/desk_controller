@@ -17,9 +17,6 @@ const TX_THREE_FRAME: [u8; DATA_FRAME_SIZE] =
     [DATA_FRAME_START, 1u8, 8u8, 0u8, 0u8, 9u8, DATA_FRAME_END];
 const TX_NOKEY_FRAME: [u8; DATA_FRAME_SIZE] =
     [DATA_FRAME_START, 1u8, 3u8, 0u8, 0u8, 4u8, DATA_FRAME_END];
-const TX_UNKNOWN_FRAME: [u8; DATA_FRAME_SIZE] =
-    [DATA_FRAME_START, 1u8, 1u8, 1u8, 1u8, 1u8, DATA_FRAME_END];
-// TODO: make frame part of Unknown enum
 
 pub type DataFrame = Vec<u8>;
 
@@ -31,7 +28,7 @@ pub enum TxMessage {
     Two,
     Three,
     NoKey,
-    Unknown,
+    Unknown(u8, u8, u8, u8, u8),
 }
 
 impl TxMessage {
@@ -43,7 +40,9 @@ impl TxMessage {
             TxMessage::Two => TX_TWO_FRAME.to_vec(),
             TxMessage::Three => TX_THREE_FRAME.to_vec(),
             TxMessage::NoKey => TX_NOKEY_FRAME.to_vec(),
-            TxMessage::Unknown => TX_UNKNOWN_FRAME.to_vec(),
+            TxMessage::Unknown(a, b, c, d, e) => {
+                vec![DATA_FRAME_START, a, b, c, d, e, DATA_FRAME_END]
+            }
         }
     }
 
@@ -55,7 +54,7 @@ impl TxMessage {
             TX_TWO_FRAME => TxMessage::Two,
             TX_THREE_FRAME => TxMessage::Three,
             TX_NOKEY_FRAME => TxMessage::NoKey,
-            _ => TxMessage::Unknown,
+            _ => TxMessage::Unknown(buf[1], buf[2], buf[3], buf[4], buf[5]),
         }
     }
 }
@@ -63,14 +62,16 @@ impl TxMessage {
 #[derive(Debug, PartialEq)]
 pub enum RxMessage {
     Height(f32),
-    Unknown,
+    Unknown(u8, u8, u8, u8, u8),
 }
 
 impl RxMessage {
     pub fn as_frame(&self) -> DataFrame {
         match *self {
             RxMessage::Height(h) => create_height_frame_from_height_cm(h).unwrap().to_vec(),
-            RxMessage::Unknown => TX_UNKNOWN_FRAME.to_vec(),
+            RxMessage::Unknown(a, b, c, d, e) => {
+                vec![DATA_FRAME_START, a, b, c, d, e, DATA_FRAME_END]
+            }
         }
     }
 
@@ -79,7 +80,7 @@ impl RxMessage {
         // println!("from_frame: {:?}, buf[1..2] = {:?}", buf, &buf[1..3]);
         match buf[1..3] {
             [1u8, 0u8] => RxMessage::Height(read_height_cm_from_frame(frame).unwrap()),
-            _ => RxMessage::Unknown,
+            _ => RxMessage::Unknown(buf[1], buf[2], buf[3], buf[4], buf[5]),
         }
     }
 }

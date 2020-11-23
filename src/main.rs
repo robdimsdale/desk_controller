@@ -73,12 +73,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (desk_to_panel_tx, desk_to_panel_rx) = unbounded::<[u8; DATA_FRAME_SIZE]>();
 
     spawn(move || loop {
-        let received_frame = desk_to_panel_rx
+        let frame = desk_to_panel_rx
             .recv()
             .expect("Failed to receive on desk_to_panel_rx");
 
         // println!("Received on desk_to_panel_rx: {:?}", received_frame);
-        let message = RxMessage::from_frame(&received_frame.to_vec());
+        let message = RxMessage::from_frame(&frame.to_vec());
+
+        if let RxMessage::Unknown(_, _, _, _, _) = message {
+            println!("Unknown desk-to-panel message: {:?}", frame)
+        }
 
         write_to_panel(message, 1).expect("Failed to write to panel uart");
     });
@@ -141,9 +145,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let mut uart_desk_write = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
 
     loop {
-        let (maybe_frame, _) = read_panel()?;
-        if let Some(frame) = maybe_frame {
-            write_to_desk(TxMessage::from_frame(&frame), 10)?;
+        if let (Some(frame), _) = read_panel()? {
+            let message = TxMessage::from_frame(&frame);
+
+            if let TxMessage::Unknown(_, _, _, _, _) = message {
+                println!("Unknown panel-to-desk message: {:?}", frame);
+            }
+
+            // Write 10x messages to account for dropping ~90% of frames
+            write_to_desk(message, 10)?;
         }
     }
 
