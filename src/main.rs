@@ -80,8 +80,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         // println!("Received on desk_to_panel_rx: {:?}", received_frame);
         let message = RxMessage::from_frame(&frame.to_vec());
 
-        if let RxMessage::Unknown(_, _, _, _, _) = message {
-            println!("Unknown desk-to-panel message: {:?}", frame)
+        match message {
+            RxMessage::Height(h) => {
+                if h < 6.50 || h > 129.5 {
+                    println!("desk-to-panel abnormal height: {:?} - {:?}", h, frame);
+                }
+            }
+            _ => {
+                println!("desk-to-panel message: {:?} - {:?}", message, frame);
+            }
         }
 
         write_to_panel(message, 1).expect("Failed to write to panel uart");
@@ -148,8 +155,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let (Some(frame), _) = read_panel()? {
             let message = TxMessage::from_frame(&frame);
 
-            if let TxMessage::Unknown(_, _, _, _, _) = message {
-                println!("Unknown panel-to-desk message: {:?}", frame);
+            match message {
+                TxMessage::NoKey => {}
+                _ => {
+                    println!("panel-to-desk message: {:?} - {:?}", message, frame);
+                }
             }
 
             // Write 10x messages to account for dropping ~90% of frames
