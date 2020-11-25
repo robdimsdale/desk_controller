@@ -11,6 +11,7 @@ pub const DATA_FRAME_SIZE: usize = 7;
 pub const DATA_FRAME_START: u8 = 104u8;
 pub const DATA_FRAME_END: u8 = 22u8;
 
+const RX_HEIGHT_BYTE: u8 = 0u8;
 const TX_UP_BYTE: u8 = 1u8;
 const TX_DOWN_BYTE: u8 = 2u8;
 const TX_NO_KEY_BYTE: u8 = 3u8;
@@ -20,13 +21,6 @@ const TX_THREE_BYTE: u8 = 8u8;
 const TX_ONE_RESET_BYTE: u8 = 10u8;
 const TX_TWO_RESET_BYTE: u8 = 11u8;
 const TX_THREE_RESET_BYTE: u8 = 12u8;
-
-const TX_UP_FRAME: [u8; DATA_FRAME_SIZE] =
-    [DATA_FRAME_START, 1u8, 1u8, 0u8, 0u8, 2u8, DATA_FRAME_END];
-const TX_DOWN_FRAME: [u8; DATA_FRAME_SIZE] =
-    [DATA_FRAME_START, 1u8, 2u8, 0u8, 0u8, 3u8, DATA_FRAME_END];
-const TX_NOKEY_FRAME: [u8; DATA_FRAME_SIZE] =
-    [DATA_FRAME_START, 1u8, 3u8, 0u8, 0u8, 4u8, DATA_FRAME_END];
 
 pub type DataFrame = Vec<u8>;
 
@@ -48,12 +42,21 @@ pub enum TxMessage {
 impl TxMessage {
     pub fn as_frame(&self) -> DataFrame {
         match *self {
-            TxMessage::Up => TX_UP_FRAME.to_vec(),
-            TxMessage::Down => TX_DOWN_FRAME.to_vec(),
-            TxMessage::One(target_height) => foo(TX_ONE_BYTE, target_height),
-            TxMessage::Two(target_height) => foo(TX_TWO_BYTE, target_height),
-            TxMessage::Three(target_height) => foo(TX_THREE_BYTE, target_height),
-            TxMessage::NoKey => TX_NOKEY_FRAME.to_vec(),
+            TxMessage::Up => build_frame(TX_UP_BYTE, 0u8, 0u8),
+            TxMessage::Down => build_frame(TX_DOWN_BYTE, 0u8, 0u8),
+            TxMessage::NoKey => build_frame(TX_NO_KEY_BYTE, 0u8, 0u8),
+            TxMessage::One(target_height) => {
+                let (height_msb, height_lsb) = height_to_bytes(target_height, 0.0);
+                build_frame(TX_ONE_BYTE, height_lsb, height_msb)
+            }
+            TxMessage::Two(target_height) => {
+                let (height_msb, height_lsb) = height_to_bytes(target_height, 0.0);
+                build_frame(TX_TWO_BYTE, height_lsb, height_msb)
+            }
+            TxMessage::Three(target_height) => {
+                let (height_msb, height_lsb) = height_to_bytes(target_height, 0.0);
+                build_frame(TX_THREE_BYTE, height_lsb, height_msb)
+            }
             TxMessage::Unknown(a, b, c, d, e) => {
                 vec![DATA_FRAME_START, a, b, c, d, e, DATA_FRAME_END]
             }
@@ -75,34 +78,19 @@ impl TxMessage {
             // TX_THREE_RESET_BYTE=>
             _ => TxMessage::Unknown(buf[1], buf[2], buf[3], buf[4], buf[5]),
         }
-        // match buf.as_slice().try_into().unwrap() {
-        //     TX_UP_FRAME => TxMessage::Up,
-        //     TX_DOWN_FRAME => TxMessage::Down,
-        //     TX_ONE_FRAME => TxMessage::One(0.0),
-        //     TX_TWO_FRAME => TxMessage::Two(0.0),
-        //     TX_THREE_FRAME => TxMessage::Three(0.0),
-        //     TX_NOKEY_FRAME => TxMessage::NoKey,
-        //     _ => TxMessage::Unknown(buf[1], buf[2], buf[3], buf[4], buf[5]),
-        // }
     }
 }
 
-fn foo(b2: u8, target_height: f32) -> DataFrame {
-    // TODO: handle 0 target height (i.e. unset)
-    // TODO: handle height outside of range
-
-    let (height_msb, height_lsb) = height_to_bytes(target_height, 0.0);
-
-    let mut frame = vec![0u8; DATA_FRAME_SIZE];
-    frame[0] = DATA_FRAME_START;
-    frame[1] = 1u8;
-    frame[2] = b2;
-    frame[3] = height_lsb;
-    frame[4] = height_msb;
-    frame[5] = checksum(&frame[1..5]);
-    frame[6] = DATA_FRAME_END;
-
-    frame
+fn build_frame(b2: u8, b3: u8, b4: u8) -> DataFrame {
+    vec![
+        DATA_FRAME_START,
+        1u8,
+        b2,
+        b3,
+        b4,
+        checksum(&[1u8, b2, b3, b4]),
+        DATA_FRAME_END,
+    ]
 }
 
 #[derive(Debug, PartialEq)]
@@ -117,17 +105,7 @@ impl RxMessage {
             RxMessage::Height(h) => {
                 // TODO: handle height outside of range
                 let (height_msb, height_lsb) = height_to_bytes(h, 65.0);
-
-                let mut frame = vec![0u8; DATA_FRAME_SIZE];
-                frame[0] = DATA_FRAME_START;
-                frame[1] = 1u8;
-                frame[2] = 0u8;
-                frame[3] = height_msb;
-                frame[4] = height_lsb;
-                frame[5] = checksum(&frame[1..5]);
-                frame[6] = DATA_FRAME_END;
-
-                frame
+                build_frame(RX_HEIGHT_BYTE, height_msb, height_lsb)
             }
             RxMessage::Unknown(a, b, c, d, e) => {
                 vec![DATA_FRAME_START, a, b, c, d, e, DATA_FRAME_END]
@@ -137,11 +115,9 @@ impl RxMessage {
 
     pub fn from_frame(frame: &DataFrame) -> RxMessage {
         // TODO: validate checksum somewhere. Or don't; just pass it on to panel?
-        let buf: [u8; DATA_FRAME_SIZE] = frame.as_slice().try_into().unwrap();
-        // println!("from_frame: {:?}, buf[1..2] = {:?}", buf, &buf[1..3]);
-        match buf[1..3] {
-            [1u8, 0u8] => RxMessage::Height(bytes_to_height_cm(buf[3], buf[4], 65.0)),
-            _ => RxMessage::Unknown(buf[1], buf[2], buf[3], buf[4], buf[5]),
+        match frame[2] {
+            RX_HEIGHT_BYTE => RxMessage::Height(bytes_to_height_cm(frame[3], frame[4], 65.0)),
+            _ => RxMessage::Unknown(frame[1], frame[2], frame[3], frame[4], frame[5]),
         }
     }
 }
@@ -340,6 +316,58 @@ mod tests {
 
     #[test]
     fn test_tx_message_as_frame() {
+        assert_eq!(
+            TxMessage::Up.as_frame(),
+            vec![
+                DATA_FRAME_START,
+                1u8,
+                TX_UP_BYTE,
+                0u8,
+                0u8,
+                2u8,
+                DATA_FRAME_END
+            ],
+        );
+
+        assert_eq!(
+            TxMessage::Down.as_frame(),
+            vec![
+                DATA_FRAME_START,
+                1u8,
+                TX_DOWN_BYTE,
+                0u8,
+                0u8,
+                3u8,
+                DATA_FRAME_END
+            ],
+        );
+
+        assert_eq!(
+            TxMessage::NoKey.as_frame(),
+            vec![
+                DATA_FRAME_START,
+                1u8,
+                TX_NO_KEY_BYTE,
+                0u8,
+                0u8,
+                4u8,
+                DATA_FRAME_END
+            ],
+        );
+
+        assert_eq!(
+            TxMessage::Unknown(99u8, 64u8, 254u8, 1u8, 98u8).as_frame(),
+            vec![
+                DATA_FRAME_START,
+                99u8,
+                64u8,
+                254u8,
+                1u8,
+                98u8,
+                DATA_FRAME_END
+            ],
+        );
+
         assert_eq!(
             TxMessage::One(0.0).as_frame(),
             vec![DATA_FRAME_START, 1u8, 6u8, 0u8, 0u8, 7u8, DATA_FRAME_END]
