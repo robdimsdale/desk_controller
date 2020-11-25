@@ -1,6 +1,7 @@
 #![feature(decl_macro)]
 use crossbeam_channel::unbounded;
 use rocket::*;
+#[cfg(target_arch = "arm")]
 use rppal::uart::{Parity, Uart};
 use std::error::Error;
 use std::thread;
@@ -9,12 +10,14 @@ use std::time::Duration;
 
 use rust_pi::*;
 
+#[cfg(target_arch = "arm")]
 #[get("/")]
 fn index() -> String {
     let height = current_height().unwrap();
     format!("Current Height: {:?} cm", height)
 }
 
+#[cfg(target_arch = "arm")]
 #[get("/move_desk/<target_height>")]
 fn move_desk(target_height: f32) -> String {
     // move_to_height_cm(target_height).unwrap();
@@ -23,12 +26,15 @@ fn move_desk(target_height: f32) -> String {
     format!("Current Height: {:?} cm", height)
 }
 
+#[cfg(target_arch = "arm")]
 fn current_height() -> Result<f32, Box<dyn Error>> {
-    if let (Some(frame), _) = read_desk()? {
-        return read_height_cm_from_frame(&frame);
-    }
-
-    Ok(0.0)
+    match read_desk()? {
+        (Some(frame), _) => match RxMessage::from_frame(&frame) {
+            RxMessage::Height(h) => return Ok(h),
+            _ => return Ok(0.0),
+        },
+        _ => return Ok(0.0),
+    };
 }
 
 // fn move_to_height_cm(target_height: f32) -> Result<(), Box<dyn Error>> {
@@ -57,6 +63,12 @@ fn current_height() -> Result<f32, Box<dyn Error>> {
 //     }
 // }
 
+#[cfg(not(target_arch = "arm"))]
+fn main() {
+    println!("Does nothing on non-arm architectures!")
+}
+
+#[cfg(target_arch = "arm")]
 fn main() -> Result<(), Box<dyn Error>> {
     // spawn(move || {
     //     rocket::ignite()
@@ -172,17 +184,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Ok(())
 }
 
-fn read_desk() -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
+#[cfg(target_arch = "arm")]
+pub fn read_desk() -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
     let mut uart_desk = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
     read_uart(&mut uart_desk)
 }
 
-fn read_panel() -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
+#[cfg(target_arch = "arm")]
+pub fn read_panel() -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
     let mut uart_panel = Uart::with_path("/dev/ttyAMA2", 9600, Parity::None, 8, 1)?;
     read_uart(&mut uart_panel)
 }
 
-fn read_uart(uart: &mut Uart) -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
+#[cfg(target_arch = "arm")]
+pub fn read_uart(uart: &mut Uart) -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
     uart.set_read_mode(1, Duration::from_millis(100))?;
 
     let mut buffer = [0u8; DATA_FRAME_SIZE];
@@ -201,7 +216,8 @@ fn read_uart(uart: &mut Uart) -> Result<(Option<DataFrame>, usize), Box<dyn Erro
     }
 }
 
-fn write_to_uart(
+#[cfg(target_arch = "arm")]
+pub fn write_to_uart(
     uart: &mut Uart,
     frame: &mut DataFrame,
     times: usize,
@@ -226,14 +242,16 @@ fn write_to_uart(
     Ok(())
 }
 
-fn write_to_panel(rx_message: RxMessage, times: usize) -> Result<(), Box<dyn Error>> {
+#[cfg(target_arch = "arm")]
+pub fn write_to_panel(rx_message: RxMessage, times: usize) -> Result<(), Box<dyn Error>> {
     // println!("Writing {:?} times to panel: {:?}", times, rx_message);
 
     let mut uart = Uart::with_path("/dev/ttyAMA2", 9600, Parity::None, 8, 1)?;
     write_to_uart(&mut uart, &mut rx_message.as_frame(), times)
 }
 
-fn write_to_desk(tx_message: TxMessage, times: usize) -> Result<(), Box<dyn Error>> {
+#[cfg(target_arch = "arm")]
+pub fn write_to_desk(tx_message: TxMessage, times: usize) -> Result<(), Box<dyn Error>> {
     // println!("Writing {:?} times to desk: {:?}", times, tx_message);
 
     let mut uart = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
