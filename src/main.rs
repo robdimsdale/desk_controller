@@ -29,8 +29,8 @@ fn move_desk(target_height: f32) -> String {
 #[cfg(target_arch = "arm")]
 fn current_height() -> Result<f32, Box<dyn Error>> {
     match read_desk()? {
-        (Some(frame), _) => match RxMessage::from_frame(&frame) {
-            RxMessage::Height(h) => return Ok(h),
+        (Some(frame), _) => match DeskToPanelMessage::from_frame(&frame) {
+            DeskToPanelMessage::Height(h) => return Ok(h),
             _ => return Ok(0.0),
         },
         _ => return Ok(0.0),
@@ -42,7 +42,7 @@ fn current_height() -> Result<f32, Box<dyn Error>> {
 //         let current_height = current_height()?;
 
 //         if current_height == target_height {
-//             write_to_desk(TxMessage::NoKey, 200);
+//             write_to_desk(PanelToDeskMessage::NoKey, 200);
 //             println!("At target height of {:?} - returning", target_height);
 //             return Ok(());
 //         }
@@ -52,13 +52,13 @@ fn current_height() -> Result<f32, Box<dyn Error>> {
 //                 "Moving up. Current height: {:?}, target height: {:?}",
 //                 current_height, target_height
 //             );
-//             write_to_desk(TxMessage::Up, 100);
+//             write_to_desk(PanelToDeskMessage::Up, 100);
 //         } else {
 //             println!(
 //                 "Moving down. Current height: {:?}, target height: {:?}",
 //                 current_height, target_height
 //             );
-//             write_to_desk(TxMessage::Down, 200);
+//             write_to_desk(PanelToDeskMessage::Down, 200);
 //         }
 //     }
 // }
@@ -90,10 +90,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             .expect("Failed to receive on desk_to_panel_rx");
 
         // println!("Received on desk_to_panel_rx: {:?}", received_frame);
-        let message = RxMessage::from_frame(&frame.to_vec());
+        let message = DeskToPanelMessage::from_frame(&frame.to_vec());
 
         match message {
-            RxMessage::Height(h) => {
+            DeskToPanelMessage::Height(h) => {
                 if h < 6.50 || h > 129.5 {
                     println!("desk-to-panel abnormal height: {:?} - {:?}", h, frame);
                 }
@@ -147,28 +147,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let mut uart_desk = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
 
     // println!("Sending Up key 300 times");
-    // write_to_desk(&mut uart_desk, TxMessage::Up, 300)?;
+    // write_to_desk(&mut uart_desk, PanelToDeskMessage::Up, 300)?;
 
     // println!("Sending NoKey 100 times");
-    // write_to_desk(&mut uart_desk, TxMessage::NoKey, 100)?;
+    // write_to_desk(&mut uart_desk, PanelToDeskMessage::NoKey, 100)?;
 
     // println!("Sleeping for 0.5 seconds");
     // thread::sleep(Duration::from_millis(500));
 
     // println!("Sending Down key 300 times");
-    // write_to_desk(&mut uart_desk, TxMessage::Down, 300)?;
+    // write_to_desk(&mut uart_desk, PanelToDeskMessage::Down, 300)?;
 
     // println!("Sending NoKey 100 times");
-    // write_to_desk(&mut uart_desk, TxMessage::NoKey, 100)?;
+    // write_to_desk(&mut uart_desk, PanelToDeskMessage::NoKey, 100)?;
 
     // let mut uart_desk_write = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
 
     loop {
         if let (Some(frame), _) = read_panel()? {
-            let message = TxMessage::from_frame(&frame);
+            let message = PanelToDeskMessage::from_frame(&frame);
 
             match message {
-                TxMessage::NoKey => {}
+                PanelToDeskMessage::NoKey => {}
                 _ => {
                     println!("panel-to-desk message: {:?} - {:?}", message, frame);
                 }
@@ -243,7 +243,7 @@ pub fn write_to_uart(
 }
 
 #[cfg(target_arch = "arm")]
-pub fn write_to_panel(rx_message: RxMessage, times: usize) -> Result<(), Box<dyn Error>> {
+pub fn write_to_panel(rx_message: DeskToPanelMessage, times: usize) -> Result<(), Box<dyn Error>> {
     // println!("Writing {:?} times to panel: {:?}", times, rx_message);
 
     let mut uart = Uart::with_path("/dev/ttyAMA2", 9600, Parity::None, 8, 1)?;
@@ -251,7 +251,7 @@ pub fn write_to_panel(rx_message: RxMessage, times: usize) -> Result<(), Box<dyn
 }
 
 #[cfg(target_arch = "arm")]
-pub fn write_to_desk(tx_message: TxMessage, times: usize) -> Result<(), Box<dyn Error>> {
+pub fn write_to_desk(tx_message: PanelToDeskMessage, times: usize) -> Result<(), Box<dyn Error>> {
     // println!("Writing {:?} times to desk: {:?}", times, tx_message);
 
     let mut uart = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
