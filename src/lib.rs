@@ -1,6 +1,3 @@
-use std::convert::TryInto;
-use std::error::Error;
-
 // Frame is 7 bytes long
 // It always starts with '104' and ends with '22'
 // The second byte indicates the key (or other things for desk->panel)
@@ -16,6 +13,7 @@ const DESK_TO_PANEL_HEIGHT_BYTE: u8 = 0u8;
 const PANEL_TO_DESK_UP_BYTE: u8 = 1u8;
 const PANEL_TO_DESK_DOWN_BYTE: u8 = 2u8;
 const PANEL_TO_DESK_NO_KEY_BYTE: u8 = 3u8;
+//const PANEL_TO_DESK_RESET_BYTE: u8 = 4u8;
 const PANEL_TO_DESK_ONE_BYTE: u8 = 6u8;
 const PANEL_TO_DESK_TWO_BYTE: u8 = 7u8;
 const PANEL_TO_DESK_THREE_BYTE: u8 = 8u8;
@@ -73,15 +71,37 @@ impl PanelToDeskMessage {
             PANEL_TO_DESK_UP_BYTE => PanelToDeskMessage::Up,
             PANEL_TO_DESK_DOWN_BYTE => PanelToDeskMessage::Down,
             PANEL_TO_DESK_NO_KEY_BYTE => PanelToDeskMessage::NoKey,
-            PANEL_TO_DESK_ONE_BYTE => PanelToDeskMessage::One(bytes_to_height_cm(buf[4], buf[3], 0.0)),
-            PANEL_TO_DESK_TWO_BYTE => PanelToDeskMessage::Two(bytes_to_height_cm(buf[4], buf[3], 0.0)),
-            PANEL_TO_DESK_THREE_BYTE => PanelToDeskMessage::Three(bytes_to_height_cm(buf[4], buf[3], 0.0)),
+            PANEL_TO_DESK_ONE_BYTE => {
+                PanelToDeskMessage::One(bytes_to_height_cm(buf[4], buf[3], 0.0))
+            }
+            PANEL_TO_DESK_TWO_BYTE => {
+                PanelToDeskMessage::Two(bytes_to_height_cm(buf[4], buf[3], 0.0))
+            }
+            PANEL_TO_DESK_THREE_BYTE => {
+                PanelToDeskMessage::Three(bytes_to_height_cm(buf[4], buf[3], 0.0))
+            }
             PANEL_TO_DESK_RESET_ONE_BYTE => PanelToDeskMessage::ResetOne,
             PANEL_TO_DESK_RESET_TWO_BYTE => PanelToDeskMessage::ResetTwo,
             PANEL_TO_DESK_RESET_THREE_BYTE => PanelToDeskMessage::ResetThree,
             _ => PanelToDeskMessage::Unknown(buf[1], buf[2], buf[3], buf[4], buf[5]),
         }
     }
+}
+
+pub fn validate_frame(frame: &DataFrame) -> bool {
+    if frame.len() != DATA_FRAME_SIZE {
+        return false;
+    }
+
+    if frame[0] != DATA_FRAME_START {
+        return false;
+    }
+
+    if frame[DATA_FRAME_SIZE - 1] != DATA_FRAME_END {
+        return false;
+    }
+
+    return true;
 }
 
 fn build_frame(b2: u8, b3: u8, b4: u8) -> DataFrame {
@@ -119,7 +139,9 @@ impl DeskToPanelMessage {
     pub fn from_frame(frame: &DataFrame) -> DeskToPanelMessage {
         // TODO: validate checksum somewhere. Or don't; just pass it on to panel?
         match frame[2] {
-            DESK_TO_PANEL_HEIGHT_BYTE => DeskToPanelMessage::Height(bytes_to_height_cm(frame[3], frame[4], 65.0)),
+            DESK_TO_PANEL_HEIGHT_BYTE => {
+                DeskToPanelMessage::Height(bytes_to_height_cm(frame[3], frame[4], 65.0))
+            }
             _ => DeskToPanelMessage::Unknown(frame[1], frame[2], frame[3], frame[4], frame[5]),
         }
     }
@@ -861,5 +883,40 @@ mod tests {
             ]),
             DeskToPanelMessage::Unknown(99u8, 64u8, 254u8, 1u8, 98u8),
         );
+    }
+
+    #[test]
+    fn test_validate_frame() {
+        assert!(!validate_frame(&vec![]));
+        assert!(!validate_frame(&vec![0u8, 0u8]));
+        assert!(!validate_frame(&vec![0u8; DATA_FRAME_SIZE]));
+        assert!(!validate_frame(&vec![
+            DATA_FRAME_START,
+            0u8,
+            0u8,
+            0u8,
+            0u8,
+            0u8,
+            0u8
+        ]));
+        assert!(!validate_frame(&vec![
+            0u8,
+            0u8,
+            0u8,
+            0u8,
+            0u8,
+            0u8,
+            DATA_FRAME_END
+        ]));
+
+        assert!(validate_frame(&vec![
+            DATA_FRAME_START,
+            0u8,
+            0u8,
+            0u8,
+            0u8,
+            0u8,
+            DATA_FRAME_END
+        ]));
     }
 }

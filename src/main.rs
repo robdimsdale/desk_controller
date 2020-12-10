@@ -10,6 +10,11 @@ use std::time::Duration;
 
 use rust_pi::*;
 
+const DESK_UART: &str = "/dev/ttyAMA3";
+const PANEL_UART: &str = "/dev/ttyAMA2";
+// const DESK_UART: &str = "/dev/ttyUSB1";
+// const PANEL_UART: &str = "/dev/ttyUSB0";
+
 #[cfg(target_arch = "arm")]
 #[get("/")]
 fn index() -> String {
@@ -70,13 +75,13 @@ fn main() {
 
 #[cfg(target_arch = "arm")]
 fn main() -> Result<(), Box<dyn Error>> {
-    // spawn(move || {
-    //     rocket::ignite()
-    //         .mount("/", routes![index, move_desk])
-    //         .launch();
-    // });
+    spawn(move || {
+        rocket::ignite()
+            .mount("/", routes![index, move_desk])
+            .launch();
+    });
 
-    let mut uart_desk_read = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
+    let mut uart_desk_read = Uart::with_path(DESK_UART, 9600, Parity::None, 8, 1)?;
 
     uart_desk_read.set_read_mode(1, Duration::new(1, 0))?;
 
@@ -114,9 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .expect("Failed to read from desk uart")
             > 0
         {
-            if buf_desk_to_panel[0] == DATA_FRAME_START
-                && buf_desk_to_panel[DATA_FRAME_SIZE - 1] == DATA_FRAME_END
-            {
+            if validate_frame(&buf_desk_to_panel.to_vec()) {
                 // println!("Sending on desk_to_panel_tx: {:?}", buf_desk_to_panel);
                 desk_to_panel_tx
                     .send(buf_desk_to_panel)
@@ -144,7 +147,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //     }
     // }
 
-    // let mut uart_desk = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
+    // let mut uart_desk = Uart::with_path(DESK_UART, 9600, Parity::None, 8, 1)?;
 
     // println!("Sending Up key 300 times");
     // write_to_desk(&mut uart_desk, PanelToDeskMessage::Up, 300)?;
@@ -161,7 +164,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // println!("Sending NoKey 100 times");
     // write_to_desk(&mut uart_desk, PanelToDeskMessage::NoKey, 100)?;
 
-    // let mut uart_desk_write = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
+    // let mut uart_desk_write = Uart::with_path(DESK_UART, 9600, Parity::None, 8, 1)?;
 
     loop {
         if let (Some(frame), _) = read_panel()? {
@@ -186,13 +189,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(target_arch = "arm")]
 pub fn read_desk() -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
-    let mut uart_desk = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
+    let mut uart_desk = Uart::with_path(DESK_UART, 9600, Parity::None, 8, 1)?;
     read_uart(&mut uart_desk)
 }
 
 #[cfg(target_arch = "arm")]
 pub fn read_panel() -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
-    let mut uart_panel = Uart::with_path("/dev/ttyAMA2", 9600, Parity::None, 8, 1)?;
+    let mut uart_panel = Uart::with_path(PANEL_UART, 9600, Parity::None, 8, 1)?;
     read_uart(&mut uart_panel)
 }
 
@@ -205,7 +208,7 @@ pub fn read_uart(uart: &mut Uart) -> Result<(Option<DataFrame>, usize), Box<dyn 
     let mut dropped_frame_count = 0;
     loop {
         if uart.read(&mut buffer)? > 0 {
-            if buffer[0] == DATA_FRAME_START && buffer[DATA_FRAME_SIZE - 1] == DATA_FRAME_END {
+            if validate_frame(&buffer.to_vec()) {
                 return Ok((Some(buffer.to_vec()), dropped_frame_count));
             } else {
                 dropped_frame_count += 1;
@@ -246,7 +249,7 @@ pub fn write_to_uart(
 pub fn write_to_panel(rx_message: DeskToPanelMessage, times: usize) -> Result<(), Box<dyn Error>> {
     // println!("Writing {:?} times to panel: {:?}", times, rx_message);
 
-    let mut uart = Uart::with_path("/dev/ttyAMA2", 9600, Parity::None, 8, 1)?;
+    let mut uart = Uart::with_path(PANEL_UART, 9600, Parity::None, 8, 1)?;
     write_to_uart(&mut uart, &mut rx_message.as_frame(), times)
 }
 
@@ -254,6 +257,6 @@ pub fn write_to_panel(rx_message: DeskToPanelMessage, times: usize) -> Result<()
 pub fn write_to_desk(tx_message: PanelToDeskMessage, times: usize) -> Result<(), Box<dyn Error>> {
     // println!("Writing {:?} times to desk: {:?}", times, tx_message);
 
-    let mut uart = Uart::with_path("/dev/ttyAMA1", 9600, Parity::None, 8, 1)?;
+    let mut uart = Uart::with_path(DESK_UART, 9600, Parity::None, 8, 1)?;
     write_to_uart(&mut uart, &mut tx_message.as_frame(), times)
 }
