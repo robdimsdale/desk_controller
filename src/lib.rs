@@ -162,6 +162,7 @@ fn height_to_bytes(height_cm: f32, offset_cm: f32) -> (u8, u8) {
 }
 
 fn checksum(b: &[u8]) -> u8 {
+    // TODO: can we do the modulo inline to avoid up-casting to usize? Is it worth it?
     (b.iter().map(|x| *x as usize).sum::<usize>() % 256) as u8
 }
 
