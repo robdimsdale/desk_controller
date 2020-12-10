@@ -13,7 +13,7 @@ const DESK_TO_PANEL_HEIGHT_BYTE: u8 = 0u8;
 const PANEL_TO_DESK_UP_BYTE: u8 = 1u8;
 const PANEL_TO_DESK_DOWN_BYTE: u8 = 2u8;
 const PANEL_TO_DESK_NO_KEY_BYTE: u8 = 3u8;
-//const PANEL_TO_DESK_RESET_BYTE: u8 = 4u8;
+const PANEL_TO_DESK_DESK_RESET_BYTE: u8 = 4u8;
 const PANEL_TO_DESK_ONE_BYTE: u8 = 6u8;
 const PANEL_TO_DESK_TWO_BYTE: u8 = 7u8;
 const PANEL_TO_DESK_THREE_BYTE: u8 = 8u8;
@@ -28,6 +28,7 @@ pub enum PanelToDeskMessage {
     Up,
     Down,
     NoKey,
+    DeskReset,
     One(f32),
     Two(f32),
     Three(f32),
@@ -43,6 +44,7 @@ impl PanelToDeskMessage {
             PanelToDeskMessage::Up => build_frame(PANEL_TO_DESK_UP_BYTE, 0u8, 0u8),
             PanelToDeskMessage::Down => build_frame(PANEL_TO_DESK_DOWN_BYTE, 0u8, 0u8),
             PanelToDeskMessage::NoKey => build_frame(PANEL_TO_DESK_NO_KEY_BYTE, 0u8, 0u8),
+            PanelToDeskMessage::DeskReset => build_frame(PANEL_TO_DESK_DESK_RESET_BYTE, 0u8, 0u8),
             PanelToDeskMessage::One(target_height) => {
                 let (height_msb, height_lsb) = height_to_bytes(target_height, 0.0);
                 build_frame(PANEL_TO_DESK_ONE_BYTE, height_lsb, height_msb)
@@ -64,13 +66,13 @@ impl PanelToDeskMessage {
         }
     }
 
-    // TODO: Add messages for resetting 1,2,3 keys
     pub fn from_frame(buf: &DataFrame) -> PanelToDeskMessage {
         // TODO: validate checksum somewhere. Or don't; just pass it on to desk?
         match buf[2] {
             PANEL_TO_DESK_UP_BYTE => PanelToDeskMessage::Up,
             PANEL_TO_DESK_DOWN_BYTE => PanelToDeskMessage::Down,
             PANEL_TO_DESK_NO_KEY_BYTE => PanelToDeskMessage::NoKey,
+            PANEL_TO_DESK_DESK_RESET_BYTE => PanelToDeskMessage::DeskReset,
             PANEL_TO_DESK_ONE_BYTE => {
                 PanelToDeskMessage::One(bytes_to_height_cm(buf[4], buf[3], 0.0))
             }
@@ -206,6 +208,19 @@ mod tests {
                 DATA_FRAME_END
             ]),
             PanelToDeskMessage::NoKey,
+        );
+
+        assert_eq!(
+            PanelToDeskMessage::from_frame(&vec![
+                DATA_FRAME_START,
+                1u8,
+                PANEL_TO_DESK_DESK_RESET_BYTE,
+                0u8,
+                0u8,
+                5u8,
+                DATA_FRAME_END
+            ]),
+            PanelToDeskMessage::DeskReset,
         );
 
         assert_eq!(
@@ -454,6 +469,19 @@ mod tests {
                 0u8,
                 0u8,
                 4u8,
+                DATA_FRAME_END
+            ],
+        );
+
+        assert_eq!(
+            PanelToDeskMessage::DeskReset.as_frame(),
+            vec![
+                DATA_FRAME_START,
+                1u8,
+                PANEL_TO_DESK_DESK_RESET_BYTE,
+                0u8,
+                0u8,
+                5u8,
                 DATA_FRAME_END
             ],
         );
