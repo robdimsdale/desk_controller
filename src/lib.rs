@@ -168,7 +168,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tx_message_from_frame() {
+    fn test_panel_to_desk_message_from_frame() {
         assert_eq!(
             PanelToDeskMessage::from_frame(&vec![
                 DATA_FRAME_START,
@@ -418,7 +418,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tx_message_as_frame() {
+    fn test_panel_to_desk_message_as_frame() {
         assert_eq!(
             PanelToDeskMessage::Up.as_frame(),
             vec![
@@ -642,7 +642,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rx_message_as_frame() {
+    fn test_desk_to_panel_message_as_frame() {
         // TODO: test < 65.0
         // TODO: test > 129.5
         // TODO: test intervals of something other than 5mm / 0.5cm
@@ -766,7 +766,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rx_message_from_frame() {
+    fn test_desk_to_panel_message_from_frame() {
         assert_eq!(
             DeskToPanelMessage::from_frame(&vec![
                 DATA_FRAME_START,
