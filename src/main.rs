@@ -38,6 +38,16 @@ fn current_height() -> Result<f32, Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    ctrlc::set_handler(move || {
+        println!("received Ctrl+C!");
+        os::deinitialize().expect("Failed to deinitialize");
+
+        std::process::exit(0);
+    })
+    .expect("Error setting Ctrl-C handler");
+
+    os::initialize()?;
+
     spawn(move || {
         rocket::ignite()
             .mount("/", routes![index, move_desk])

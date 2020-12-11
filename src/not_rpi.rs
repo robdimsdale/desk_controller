@@ -1,6 +1,14 @@
 use rust_pi::*;
 use std::error::Error;
 
+pub fn initialize() -> Result<(), Box<dyn Error>> {
+    Ok(())
+}
+
+pub fn deinitialize() -> Result<(), Box<dyn Error>> {
+    Ok(())
+}
+
 pub fn read_desk() -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
     Ok((Some(DeskToPanelMessage::Height(123.5).as_frame()), 0))
 }

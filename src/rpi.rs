@@ -1,5 +1,8 @@
 #[cfg(target_arch = "arm")]
+use rppal::gpio::Gpio;
+#[cfg(target_arch = "arm")]
 use rppal::uart::{Parity, Uart};
+
 use rust_pi::*;
 use std::error::Error;
 use std::thread;
@@ -9,6 +12,35 @@ const DESK_UART: &str = "/dev/ttyAMA3";
 const PANEL_UART: &str = "/dev/ttyAMA2";
 // const DESK_UART: &str = "/dev/ttyUSB1";
 // const PANEL_UART: &str = "/dev/ttyUSB0";
+
+// Gpio uses BCM pin numbering. BCM GPIO 22 is tied to physical pin 15.
+const GPIO_LED: u8 = 22;
+
+#[cfg(target_arch = "arm")]
+pub fn initialize() -> Result<(), Box<dyn Error>> {
+    println!("Turning on LED {}.", GPIO_LED,);
+
+    let mut pin = Gpio::new()?.get(GPIO_LED)?.into_output();
+
+    pin.set_high();
+
+    Ok(())
+}
+
+#[cfg(target_arch = "arm")]
+pub fn deinitialize() -> Result<(), Box<dyn Error>> {
+    println!("Turning off LED {}.", GPIO_LED,);
+
+    let mut pin = Gpio::new()?.get(GPIO_LED)?.into_output();
+
+    pin.set_low();
+    drop(pin);
+
+    let current_state = Gpio::new()?.get(GPIO_LED)?.read();
+    println!("Current state of LED {}: {}.", GPIO_LED, current_state);
+
+    Ok(())
+}
 
 #[cfg(target_arch = "arm")]
 pub fn read_desk() -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
