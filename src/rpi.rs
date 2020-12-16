@@ -3,7 +3,8 @@ use rppal::gpio::Gpio;
 #[cfg(target_arch = "arm")]
 use rppal::uart::{Parity, Uart};
 
-use rust_pi::*;
+use crate::protocol;
+use crate::protocol::{DeskToPanelMessage, PanelToDeskMessage, DATA_FRAME_SIZE};
 use std::error::Error;
 use std::thread;
 use std::time::Duration;
@@ -18,7 +19,7 @@ const GPIO_LED: u8 = 22;
 
 #[cfg(target_arch = "arm")]
 pub fn initialize() -> Result<(), Box<dyn Error>> {
-    println!("Turning on LED {}.", GPIO_LED,);
+    println!("Turning on LED at GPIO {}.", GPIO_LED,);
 
     let mut pin = Gpio::new()?.get(GPIO_LED)?.into_output();
 
@@ -28,8 +29,8 @@ pub fn initialize() -> Result<(), Box<dyn Error>> {
 }
 
 #[cfg(target_arch = "arm")]
-pub fn deinitialize() -> Result<(), Box<dyn Error>> {
-    println!("Turning off LED {}.", GPIO_LED,);
+pub fn shutdown() -> Result<(), Box<dyn Error>> {
+    println!("Turning off LED at GPIO {}.", GPIO_LED,);
 
     let mut pin = Gpio::new()?.get(GPIO_LED)?.into_output();
 
@@ -37,25 +38,41 @@ pub fn deinitialize() -> Result<(), Box<dyn Error>> {
     drop(pin);
 
     let current_state = Gpio::new()?.get(GPIO_LED)?.read();
-    println!("Current state of LED {}: {}.", GPIO_LED, current_state);
+    println!("New state of LED at GPIO {}: {}.", GPIO_LED, current_state);
 
     Ok(())
 }
 
 #[cfg(target_arch = "arm")]
-pub fn read_desk() -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
+pub fn read_desk() -> Result<(Option<DeskToPanelMessage>, usize), Box<dyn Error>> {
     let mut uart_desk = Uart::with_path(DESK_UART, 9600, Parity::None, 8, 1)?;
-    read_uart(&mut uart_desk)
+    let (maybe_frame, dropped_frame_count) = read_uart(&mut uart_desk)?;
+    if let Some(frame) = maybe_frame {
+        Ok((
+            Some(DeskToPanelMessage::from_frame(&frame)),
+            dropped_frame_count,
+        ))
+    } else {
+        Ok((None, dropped_frame_count))
+    }
 }
 
 #[cfg(target_arch = "arm")]
-pub fn read_panel() -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
+pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error>> {
     let mut uart_panel = Uart::with_path(PANEL_UART, 9600, Parity::None, 8, 1)?;
-    read_uart(&mut uart_panel)
+    let (maybe_frame, dropped_frame_count) = read_uart(&mut uart_panel)?;
+    if let Some(frame) = maybe_frame {
+        Ok((
+            Some(PanelToDeskMessage::from_frame(&frame)),
+            dropped_frame_count,
+        ))
+    } else {
+        Ok((None, dropped_frame_count))
+    }
 }
 
 #[cfg(target_arch = "arm")]
-pub fn read_uart(uart: &mut Uart) -> Result<(Option<DataFrame>, usize), Box<dyn Error>> {
+fn read_uart(uart: &mut Uart) -> Result<(Option<protocol::DataFrame>, usize), Box<dyn Error>> {
     uart.set_read_mode(1, Duration::from_millis(100))?;
 
     let mut buffer = [0u8; DATA_FRAME_SIZE];
@@ -63,7 +80,7 @@ pub fn read_uart(uart: &mut Uart) -> Result<(Option<DataFrame>, usize), Box<dyn 
     let mut dropped_frame_count = 0;
     loop {
         if uart.read(&mut buffer)? > 0 {
-            if validate_frame(&buffer.to_vec()) {
+            if protocol::validate_frame(&buffer.to_vec()) {
                 return Ok((Some(buffer.to_vec()), dropped_frame_count));
             } else {
                 dropped_frame_count += 1;
@@ -75,9 +92,9 @@ pub fn read_uart(uart: &mut Uart) -> Result<(Option<DataFrame>, usize), Box<dyn 
 }
 
 #[cfg(target_arch = "arm")]
-pub fn write_to_uart(
+fn write_to_uart(
     uart: &mut Uart,
-    frame: &mut DataFrame,
+    frame: &mut protocol::DataFrame,
     times: usize,
 ) -> Result<(), Box<dyn Error>> {
     for i in 0..times {
@@ -101,17 +118,17 @@ pub fn write_to_uart(
 }
 
 #[cfg(target_arch = "arm")]
-pub fn write_to_panel(rx_message: DeskToPanelMessage, times: usize) -> Result<(), Box<dyn Error>> {
+pub fn write_to_panel(message: DeskToPanelMessage, times: usize) -> Result<(), Box<dyn Error>> {
     // println!("Writing {:?} times to panel: {:?}", times, rx_message);
 
     let mut uart = Uart::with_path(PANEL_UART, 9600, Parity::None, 8, 1)?;
-    write_to_uart(&mut uart, &mut rx_message.as_frame(), times)
+    write_to_uart(&mut uart, &mut message.as_frame(), times)
 }
 
 #[cfg(target_arch = "arm")]
-pub fn write_to_desk(tx_message: PanelToDeskMessage, times: usize) -> Result<(), Box<dyn Error>> {
+pub fn write_to_desk(message: PanelToDeskMessage, times: usize) -> Result<(), Box<dyn Error>> {
     // println!("Writing {:?} times to desk: {:?}", times, tx_message);
 
     let mut uart = Uart::with_path(DESK_UART, 9600, Parity::None, 8, 1)?;
-    write_to_uart(&mut uart, &mut tx_message.as_frame(), times)
+    write_to_uart(&mut uart, &mut message.as_frame(), times)
 }

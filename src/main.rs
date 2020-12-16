@@ -1,12 +1,5 @@
 #![feature(decl_macro)]
 
-#[cfg_attr(all(target_os = "linux", target_arch = "arm"), path = "rpi.rs")]
-#[cfg_attr(
-    not(all(target_os = "linux", target_arch = "arm")),
-    path = "not_rpi.rs"
-)]
-mod os;
-
 use crossbeam_channel::unbounded;
 use rocket::*;
 use rust_pi::*;
@@ -28,25 +21,25 @@ fn move_desk(target_height: f32) -> String {
 }
 
 fn current_height() -> Result<f32, Box<dyn Error>> {
-    match os::read_desk()? {
-        (Some(frame), _) => match DeskToPanelMessage::from_frame(&frame) {
+    if let (Some(message), _) = rust_pi::read_desk()? {
+        match message {
             DeskToPanelMessage::Height(h) => return Ok(h),
             _ => return Ok(0.0),
-        },
-        _ => return Ok(0.0),
-    };
+        }
+    }
+    Ok(0.0)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     ctrlc::set_handler(move || {
         println!("received Ctrl+C!");
-        os::deinitialize().expect("Failed to deinitialize");
+        rust_pi::shutdown().expect("Failed to shutdown");
 
         std::process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
 
-    os::initialize()?;
+    rust_pi::initialize()?;
 
     spawn(move || {
         rocket::ignite()
@@ -80,15 +73,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        os::write_to_panel(message, 1).expect("Failed to write to panel");
+        rust_pi::write_to_panel(message, 1).expect("Failed to write to panel");
     });
 
     // Spawn the thread and move ownership of the sending half into the new thread. This can also be
     // cloned if needed since there can be multiple producers.
     spawn(move || loop {
-        if let (Some(frame), _) = os::read_desk().expect("Failed to read from desk") {
-            let message = DeskToPanelMessage::from_frame(&frame);
-            // println!("Sending on desk_to_panel_tx: {:?}", message);
+        if let (Some(message), _) = rust_pi::read_desk().expect("Failed to read from desk") {
+            // println!("Sending on desk_to_panel_tx: {:?}", message)b;
             desk_to_panel_tx
                 .send(message)
                 .expect("Failed to send on desk_to_panel_tx");
@@ -96,18 +88,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     loop {
-        if let (Some(frame), _) = os::read_panel()? {
-            let message = PanelToDeskMessage::from_frame(&frame);
-
+        if let (Some(message), _) = rust_pi::read_panel()? {
             match message {
                 PanelToDeskMessage::NoKey => {}
                 _ => {
-                    println!("panel-to-desk message: {:?} - {:?}", message, frame);
+                    println!(
+                        "panel-to-desk message: {:?} - {:?}",
+                        message,
+                        message.as_frame()
+                    );
                 }
             }
 
             // Write 10x messages to account for dropping ~90% of frames
-            os::write_to_desk(message, 10)?;
+            rust_pi::write_to_desk(message, 10)?;
         }
     }
 }
