@@ -5,8 +5,9 @@
 // [START,a,b,c,d,CHECKSUM,END]
 
 pub const DATA_FRAME_SIZE: usize = 7;
-pub const DATA_FRAME_START_BYTE: u8 = 104u8;
-pub const DATA_FRAME_END_BYTE: u8 = 22u8;
+
+const DATA_FRAME_START_BYTE: u8 = 104u8;
+const DATA_FRAME_END_BYTE: u8 = 22u8;
 
 const DESK_TO_PANEL_HEIGHT_BYTE: u8 = 0u8;
 
