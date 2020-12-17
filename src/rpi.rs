@@ -46,28 +46,28 @@ pub fn shutdown() -> Result<(), Box<dyn Error>> {
 #[cfg(target_arch = "arm")]
 pub fn read_desk() -> Result<(Option<DeskToPanelMessage>, usize), Box<dyn Error>> {
     let mut uart_desk = Uart::with_path(DESK_UART, 9600, Parity::None, 8, 1)?;
-    let (maybe_frame, dropped_frame_count) = read_uart(&mut uart_desk)?;
+    let (maybe_frame, dropped_byte_count) = read_uart(&mut uart_desk)?;
     if let Some(frame) = maybe_frame {
         Ok((
             Some(DeskToPanelMessage::from_frame(&frame)),
-            dropped_frame_count,
+            dropped_byte_count,
         ))
     } else {
-        Ok((None, dropped_frame_count))
+        Ok((None, dropped_byte_count))
     }
 }
 
 #[cfg(target_arch = "arm")]
 pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error>> {
     let mut uart_panel = Uart::with_path(PANEL_UART, 9600, Parity::None, 8, 1)?;
-    let (maybe_frame, dropped_frame_count) = read_uart(&mut uart_panel)?;
+    let (maybe_frame, dropped_byte_count) = read_uart(&mut uart_panel)?;
     if let Some(frame) = maybe_frame {
         Ok((
             Some(PanelToDeskMessage::from_frame(&frame)),
-            dropped_frame_count,
+            dropped_byte_count,
         ))
     } else {
-        Ok((None, dropped_frame_count))
+        Ok((None, dropped_byte_count))
     }
 }
 
@@ -104,7 +104,7 @@ fn read_uart(uart: &mut Uart) -> Result<(Option<protocol::DataFrame>, usize), Bo
                         &frame.to_vec(),
                         dropped_byte_count
                     );
-                    return Ok((Some(frame.to_vec()), dropped_byte_count / DATA_FRAME_SIZE));
+                    return Ok((Some(frame.to_vec()), dropped_byte_count));
                 } else {
                     println!("Invalid frame: {:?}", &frame.to_vec());
                     dropped_byte_count += DATA_FRAME_SIZE;
