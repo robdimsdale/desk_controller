@@ -8,7 +8,7 @@ use std::thread::spawn;
 
 #[get("/")]
 fn index() -> String {
-    let height = current_height().unwrap();
+    let height = rust_pi::current_height();
     format!("Current Height: {:?} cm", height)
 }
 
@@ -16,18 +16,8 @@ fn index() -> String {
 fn move_desk(target_height: f32) -> String {
     // move_to_height_cm(target_height).unwrap();
 
-    let height = current_height().unwrap();
+    let height = rust_pi::current_height();
     format!("Current Height: {:?} cm", height)
-}
-
-fn current_height() -> Result<f32, Box<dyn Error>> {
-    if let (Some(message), _) = rust_pi::read_desk()? {
-        match message {
-            DeskToPanelMessage::Height(h) => return Ok(h),
-            _ => return Ok(0.0),
-        }
-    }
-    Ok(0.0)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

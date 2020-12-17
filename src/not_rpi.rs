@@ -1,5 +1,5 @@
 use crate::protocol::{DeskToPanelMessage, PanelToDeskMessage};
-
+use rand::Rng;
 use std::error::Error;
 
 pub fn initialize() -> Result<(), Box<dyn Error>> {
@@ -11,7 +11,9 @@ pub fn shutdown() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn read_desk() -> Result<(Option<DeskToPanelMessage>, usize), Box<dyn Error>> {
-    Ok((Some(DeskToPanelMessage::Height(123.5)), 0))
+    let mut rng = rand::thread_rng();
+    let height = rng.gen::<f32>() * 64.0 + 65.0;
+    Ok((Some(DeskToPanelMessage::Height(height)), 0))
 }
 
 pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error>> {
