@@ -75,15 +75,18 @@ pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error
 fn read_uart(uart: &mut Uart) -> Result<(Option<protocol::DataFrame>, usize), Box<dyn Error>> {
     uart.set_read_mode(1, Duration::from_millis(100))?;
 
-    let mut buffer = [0u8; DATA_FRAME_SIZE];
+    let mut buffer = [0u8; DATA_FRAME_SIZE * 2];
 
     let mut dropped_frame_count = 0;
     loop {
         if uart.read(&mut buffer)? > 0 {
-            if protocol::validate_frame(&buffer.to_vec()) {
-                return Ok((Some(buffer.to_vec()), dropped_frame_count));
-            } else {
-                dropped_frame_count += 1;
+            for i in 0..DATA_FRAME_SIZE {
+                let frame = buffer[i..i + DATA_FRAME_SIZE].to_vec();
+                if protocol::validate_frame(&frame) {
+                    return Ok((Some(frame), dropped_frame_count));
+                } else {
+                    dropped_frame_count += 1;
+                }
             }
         } else {
             return Ok((None, 0));
