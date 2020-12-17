@@ -8,8 +8,11 @@ use std::thread::spawn;
 
 #[get("/")]
 fn index() -> String {
-    let height = rust_pi::current_height();
-    format!("Current Height: {:?} cm", height)
+    format!(
+        "Current Height: {:?} cm\nCurrent Panel Key: {:?}",
+        rust_pi::current_height(),
+        rust_pi::current_panel_key()
+    )
 }
 
 #[get("/move_desk/<target_height>")]

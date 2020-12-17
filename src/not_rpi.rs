@@ -17,7 +17,7 @@ pub fn read_desk() -> Result<(Option<DeskToPanelMessage>, usize), Box<dyn Error>
 }
 
 pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error>> {
-    Ok((None, 0))
+    Ok((Some(PanelToDeskMessage::Three(121.0)), 0))
 }
 
 pub fn write_to_panel(message: DeskToPanelMessage, times: usize) -> Result<(), Box<dyn Error>> {

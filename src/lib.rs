@@ -16,6 +16,7 @@ use std::sync::Mutex;
 
 lazy_static! {
     static ref CURRENT_HEIGHT: Mutex<f32> = Mutex::new(0.0);
+    static ref CURRENT_PANEL_KEY: Mutex<Option<PanelToDeskMessage>> = Mutex::new(None);
 }
 
 pub fn initialize() -> Result<(), Box<dyn Error>> {
@@ -36,7 +37,11 @@ pub fn read_desk() -> Result<(Option<DeskToPanelMessage>, usize), Box<dyn Error>
     Ok((maybe_message, dropped_frame_count))
 }
 pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error>> {
-    os::read_panel()
+    let (maybe_message, dropped_frame_count) = os::read_panel()?;
+
+    *CURRENT_PANEL_KEY.lock().unwrap() = maybe_message;
+
+    Ok((maybe_message, dropped_frame_count))
 }
 
 pub fn write_to_panel(message: DeskToPanelMessage, times: usize) -> Result<(), Box<dyn Error>> {
@@ -49,4 +54,8 @@ pub fn write_to_desk(message: PanelToDeskMessage, times: usize) -> Result<(), Bo
 
 pub fn current_height() -> f32 {
     *CURRENT_HEIGHT.lock().unwrap()
+}
+
+pub fn current_panel_key() -> Option<PanelToDeskMessage> {
+    *CURRENT_PANEL_KEY.lock().unwrap()
 }

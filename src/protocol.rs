@@ -24,7 +24,7 @@ const PANEL_TO_DESK_RESET_THREE_BYTE: u8 = 12u8;
 
 pub type DataFrame = Vec<u8>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PanelToDeskMessage {
     Up,
     Down,
@@ -119,7 +119,7 @@ fn build_frame(b2: u8, b3: u8, b4: u8) -> DataFrame {
     ]
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DeskToPanelMessage {
     Height(f32),
     Unknown(u8, u8, u8, u8, u8),
