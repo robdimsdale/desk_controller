@@ -17,6 +17,10 @@ use std::sync::Mutex;
 lazy_static! {
     static ref CURRENT_HEIGHT: Mutex<f32> = Mutex::new(0.0);
     static ref CURRENT_PANEL_KEY: Mutex<Option<PanelToDeskMessage>> = Mutex::new(None);
+    static ref DESK_DROPPED_FRAME_COUNT: Mutex<usize> = Mutex::new(0);
+    static ref DESK_FOUND_FRAME_COUNT: Mutex<usize> = Mutex::new(0);
+    static ref PANEL_DROPPED_FRAME_COUNT: Mutex<usize> = Mutex::new(0);
+    static ref PANEL_FOUND_FRAME_COUNT: Mutex<usize> = Mutex::new(0);
 }
 
 pub fn initialize() -> Result<(), Box<dyn Error>> {
@@ -30,9 +34,13 @@ pub fn shutdown() -> Result<(), Box<dyn Error>> {
 pub fn read_desk() -> Result<(Option<DeskToPanelMessage>, usize), Box<dyn Error>> {
     let (maybe_message, dropped_frame_count) = os::read_desk()?;
 
-    if let Some(DeskToPanelMessage::Height(h)) = maybe_message {
-        *CURRENT_HEIGHT.lock().unwrap() = h;
+    if let Some(message) = maybe_message {
+        *DESK_FOUND_FRAME_COUNT.lock().unwrap() += 1;
+        if let DeskToPanelMessage::Height(h) = message {
+            *CURRENT_HEIGHT.lock().unwrap() = h;
+        }
     }
+    *DESK_DROPPED_FRAME_COUNT.lock().unwrap() += dropped_frame_count;
 
     Ok((maybe_message, dropped_frame_count))
 }
@@ -40,6 +48,10 @@ pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error
     let (maybe_message, dropped_frame_count) = os::read_panel()?;
 
     *CURRENT_PANEL_KEY.lock().unwrap() = maybe_message;
+    if let Some(_) = maybe_message {
+        *PANEL_FOUND_FRAME_COUNT.lock().unwrap() += 1;
+    }
+    *PANEL_DROPPED_FRAME_COUNT.lock().unwrap() += dropped_frame_count;
 
     Ok((maybe_message, dropped_frame_count))
 }
@@ -58,4 +70,18 @@ pub fn current_height() -> f32 {
 
 pub fn current_panel_key() -> Option<PanelToDeskMessage> {
     *CURRENT_PANEL_KEY.lock().unwrap()
+}
+
+pub fn desk_frame_counts() -> (usize, usize) {
+    (
+        *DESK_FOUND_FRAME_COUNT.lock().unwrap(),
+        *DESK_DROPPED_FRAME_COUNT.lock().unwrap(),
+    )
+}
+
+pub fn panel_frame_counts() -> (usize, usize) {
+    (
+        *PANEL_FOUND_FRAME_COUNT.lock().unwrap(),
+        *PANEL_DROPPED_FRAME_COUNT.lock().unwrap(),
+    )
 }

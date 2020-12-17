@@ -8,10 +8,18 @@ use std::thread::spawn;
 
 #[get("/")]
 fn index() -> String {
+    let (desk_found_frames, desk_dropped_frames) = rust_pi::desk_frame_counts();
+    let (panel_found_frames, panel_dropped_frames) = rust_pi::panel_frame_counts();
     format!(
-        "Current Height: {:?} cm\nCurrent Panel Key: {:?}",
+        "Current Height: {:?} cm\nCurrent Panel Key: {:?}\nDesk - frames found: {:?}, frames dropped: {:?} ({:?})\nPanel - frames found: {:?}, dropped: {:?} ({:?}%)",
         rust_pi::current_height(),
-        rust_pi::current_panel_key()
+        rust_pi::current_panel_key(),
+        desk_found_frames,
+        desk_dropped_frames,
+    100.0*desk_dropped_frames as f32 / (desk_found_frames + desk_dropped_frames) as f32,
+        panel_found_frames,
+        panel_dropped_frames,
+        100.0*panel_dropped_frames as f32 / (panel_found_frames + panel_dropped_frames) as f32,
     )
 }
 
