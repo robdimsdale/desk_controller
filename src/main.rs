@@ -32,9 +32,13 @@ fn move_desk(target_height: f32) -> String {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let (ctl_tx, ctl_rx) = unbounded::<bool>();
+
     ctrlc::set_handler(move || {
         println!("received Ctrl+C!");
         rust_pi::shutdown().expect("Failed to shutdown");
+
+        ctl_tx.send(true).expect("Failed to send shutdown signal");
 
         std::process::exit(0);
     })
@@ -48,61 +52,5 @@ fn main() -> Result<(), Box<dyn Error>> {
             .launch();
     });
 
-    let (desk_to_panel_tx, desk_to_panel_rx) = unbounded::<DeskToPanelMessage>();
-
-    spawn(move || loop {
-        let message = desk_to_panel_rx
-            .recv()
-            .expect("Failed to receive on desk_to_panel_rx");
-
-        match message {
-            DeskToPanelMessage::Height(h) => {
-                if h < 6.50 || h > 129.5 {
-                    println!(
-                        "desk-to-panel abnormal height: {:?} - {:?}",
-                        h,
-                        message.as_frame()
-                    );
-                }
-            }
-            _ => {
-                println!(
-                    "desk-to-panel message: {:?} - {:?}",
-                    message,
-                    message.as_frame()
-                );
-            }
-        }
-
-        rust_pi::write_to_panel(message, 1).expect("Failed to write to panel");
-    });
-
-    // Spawn the thread and move ownership of the sending half into the new thread. This can also be
-    // cloned if needed since there can be multiple producers.
-    spawn(move || loop {
-        if let (Some(message), _) = rust_pi::read_desk().expect("Failed to read from desk") {
-            // println!("Sending on desk_to_panel_tx: {:?}", message)b;
-            desk_to_panel_tx
-                .send(message)
-                .expect("Failed to send on desk_to_panel_tx");
-        }
-    });
-
-    loop {
-        if let (Some(message), _) = rust_pi::read_panel()? {
-            match message {
-                PanelToDeskMessage::NoKey => {}
-                _ => {
-                    println!(
-                        "panel-to-desk message: {:?} - {:?}",
-                        message,
-                        message.as_frame()
-                    );
-                }
-            }
-
-            // Write 10x messages to account for dropping ~90% of frames
-            rust_pi::write_to_desk(message, 10)?;
-        }
-    }
+    rust_pi::run(ctl_rx)
 }
