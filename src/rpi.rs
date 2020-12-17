@@ -75,19 +75,45 @@ pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error
 fn read_uart(uart: &mut Uart) -> Result<(Option<protocol::DataFrame>, usize), Box<dyn Error>> {
     uart.set_read_mode(1, Duration::from_millis(100))?;
 
-    let mut buffer = [0u8; DATA_FRAME_SIZE * 2];
+    let mut buffer = [0u8; 1];
+    let mut frame = [0u8; DATA_FRAME_SIZE];
+    let mut frame_index = 0;
 
-    let mut dropped_frame_count = 0;
+    let mut dropped_byte_count = 0;
     loop {
         if uart.read(&mut buffer)? > 0 {
-            for i in 0..DATA_FRAME_SIZE {
-                let frame = buffer[i..i + DATA_FRAME_SIZE].to_vec();
-                if protocol::validate_frame(&frame) {
-                    return Ok((Some(frame), dropped_frame_count));
-                } else {
-                    dropped_frame_count += 1;
+            let b = buffer[0];
+
+            println!("byte: {:?}, frame_index: {:?}", b, frame_index);
+
+            frame[frame_index] = b;
+
+            if frame_index == 0 {
+                if !protocol::is_start_byte(b) {
+                    dropped_byte_count += 1;
+                    println!("Not starting byte: {:?} - dropping", b);
+                    continue;
                 }
             }
+
+            if frame_index == DATA_FRAME_SIZE - 1 {
+                println!("Validating frame: {:?}", &frame.to_vec());
+                if protocol::validate_frame(&frame.to_vec()) {
+                    println!(
+                        "Returning valid frame: {:?} - dropped byte count: {:?}",
+                        &frame.to_vec(),
+                        dropped_byte_count
+                    );
+                    return Ok((Some(frame.to_vec()), dropped_byte_count / DATA_FRAME_SIZE));
+                } else {
+                    println!("Invalid frame: {:?}", &frame.to_vec());
+                    dropped_byte_count += DATA_FRAME_SIZE;
+                    frame_index = 0;
+                    continue;
+                }
+            }
+
+            frame_index += 1;
         } else {
             return Ok((None, 0));
         }

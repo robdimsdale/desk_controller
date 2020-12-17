@@ -91,6 +91,10 @@ impl PanelToDeskMessage {
     }
 }
 
+pub fn is_start_byte(b: u8) -> bool {
+    b == DATA_FRAME_START_BYTE
+}
+
 pub fn validate_frame(frame: &DataFrame) -> bool {
     if frame.len() != DATA_FRAME_SIZE {
         return false;
