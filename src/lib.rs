@@ -137,6 +137,43 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
     Ok(())
 }
 
+pub fn move_to_height(height_in_cm: f32) -> Result<(), Box<dyn Error>> {
+    // TODO: validate that height is in range (65.0 to 129.5)
+    // TODO: validate that height is a multiple of 0.5
+
+    let current_key = current_panel_key();
+    // TODO: override PanelToDeskMessage:NoKey
+    // if current_key.is_some() && current_key != Some(PanelToDeskMessage::NoKey) {
+    if current_key.is_some() {
+        println!("Cannot move desk while panel key is pressed");
+        return Ok(());
+    }
+
+    // TODO: handle situation(s) where desk isn't moving even though we're sending it a key
+    // - one situation is if we recently pressed another key
+    // - another situation is if we are too close to the target height
+
+    let times = 10;
+    if height_in_cm == current_height() {
+        println!("At target height of {:?}", height_in_cm);
+        return Ok(());
+    }
+
+    while current_height() < height_in_cm {
+        for _ in 0..times {
+            os::write_to_desk(PanelToDeskMessage::Up)?;
+        }
+    }
+
+    while current_height() > height_in_cm {
+        for _ in 0..times {
+            os::write_to_desk(PanelToDeskMessage::Down)?;
+        }
+    }
+
+    Ok(())
+}
+
 pub fn current_height() -> f32 {
     *CURRENT_HEIGHT.lock().unwrap()
 }

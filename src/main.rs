@@ -24,11 +24,8 @@ fn index() -> String {
 }
 
 #[get("/move_desk/<target_height>")]
-fn move_desk(target_height: f32) -> String {
-    // move_to_height_cm(target_height).unwrap();
-
-    let height = rust_pi::current_height();
-    format!("Current Height: {:?} cm", height)
+fn move_desk(target_height: f32) -> () {
+    rust_pi::move_to_height(target_height).unwrap();
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
