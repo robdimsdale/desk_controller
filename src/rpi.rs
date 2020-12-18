@@ -1,21 +1,41 @@
 #[cfg(target_arch = "arm")]
-use rppal::gpio::Gpio;
-#[cfg(target_arch = "arm")]
 use rppal::uart::{Parity, Uart};
 
 use crate::protocol;
 use crate::protocol::{DeskToPanelMessage, PanelToDeskMessage, DATA_FRAME_SIZE};
+#[cfg(target_arch = "arm")]
+use rppal::gpio::Gpio;
 use std::error::Error;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
-const DESK_UART: &str = "/dev/ttyAMA3";
-const PANEL_UART: &str = "/dev/ttyAMA2";
-// const DESK_UART: &str = "/dev/ttyUSB1";
-// const PANEL_UART: &str = "/dev/ttyUSB0";
+const DESK_UART_PATH: &str = "/dev/ttyAMA3";
+const PANEL_UART_PATH: &str = "/dev/ttyAMA2";
+// const DESK_UART_PATH: &str = "/dev/ttyUSB1";
+// const PANEL_UART_PATH: &str = "/dev/ttyUSB0";
 
 // Gpio uses BCM pin numbering. BCM GPIO 22 is tied to physical pin 15.
 const GPIO_LED: u8 = 22;
+
+lazy_static! {
+    static ref UART_PANEL_READ: Mutex<Uart> = Mutex::new(
+        Uart::with_path(PANEL_UART_PATH, 9600, Parity::None, 8, 1)
+            .expect("Failed to initialize panel uart")
+    );
+    static ref UART_PANEL_WRITE: Mutex<Uart> = Mutex::new(
+        Uart::with_path(PANEL_UART_PATH, 9600, Parity::None, 8, 1)
+            .expect("Failed to initialize panel uart")
+    );
+    static ref UART_DESK_READ: Mutex<Uart> = Mutex::new(
+        Uart::with_path(DESK_UART_PATH, 9600, Parity::None, 8, 1)
+            .expect("Failed to initialize desk uart")
+    );
+    static ref UART_DESK_WRITE: Mutex<Uart> = Mutex::new(
+        Uart::with_path(DESK_UART_PATH, 9600, Parity::None, 8, 1)
+            .expect("Failed to initialize desk uart")
+    );
+}
 
 #[cfg(target_arch = "arm")]
 pub fn initialize() -> Result<(), Box<dyn Error>> {
@@ -45,8 +65,7 @@ pub fn shutdown() -> Result<(), Box<dyn Error>> {
 
 #[cfg(target_arch = "arm")]
 pub fn read_desk() -> Result<(Option<DeskToPanelMessage>, usize), Box<dyn Error>> {
-    let mut uart_desk = Uart::with_path(DESK_UART, 9600, Parity::None, 8, 1)?;
-    let (maybe_frame, dropped_byte_count) = read_uart(&mut uart_desk)?;
+    let (maybe_frame, dropped_byte_count) = read_uart(&mut UART_DESK_READ.lock().unwrap())?;
     if let Some(frame) = maybe_frame {
         Ok((
             Some(DeskToPanelMessage::from_frame(&frame)),
@@ -59,8 +78,7 @@ pub fn read_desk() -> Result<(Option<DeskToPanelMessage>, usize), Box<dyn Error>
 
 #[cfg(target_arch = "arm")]
 pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error>> {
-    let mut uart_panel = Uart::with_path(PANEL_UART, 9600, Parity::None, 8, 1)?;
-    let (maybe_frame, dropped_byte_count) = read_uart(&mut uart_panel)?;
+    let (maybe_frame, dropped_byte_count) = read_uart(&mut UART_PANEL_READ.lock().unwrap())?;
     if let Some(frame) = maybe_frame {
         Ok((
             Some(PanelToDeskMessage::from_frame(&frame)),
@@ -84,26 +102,26 @@ fn read_uart(uart: &mut Uart) -> Result<(Option<protocol::DataFrame>, usize), Bo
         if uart.read(&mut buffer)? > 0 {
             let b = buffer[0];
 
-            println!("byte: {:?}, frame_index: {:?}", b, frame_index);
+            // println!("byte: {:?}, frame_index: {:?}", b, frame_index);
 
             frame[frame_index] = b;
 
             if frame_index == 0 {
                 if !protocol::is_start_byte(b) {
                     dropped_byte_count += 1;
-                    println!("Not starting byte: {:?} - dropping", b);
+                    // println!("Not starting byte: {:?} - dropping", b);
                     continue;
                 }
             }
 
             if frame_index == DATA_FRAME_SIZE - 1 {
-                println!("Validating frame: {:?}", &frame.to_vec());
+                // println!("Validating frame: {:?}", &frame.to_vec());
                 if protocol::validate_frame(&frame.to_vec()) {
-                    println!(
-                        "Returning valid frame: {:?} - dropped byte count: {:?}",
-                        &frame.to_vec(),
-                        dropped_byte_count
-                    );
+                    // println!(
+                    //     "Returning valid frame: {:?} - dropped byte count: {:?}",
+                    //     &frame.to_vec(),
+                    //     dropped_byte_count
+                    // );
                     return Ok((Some(frame.to_vec()), dropped_byte_count));
                 } else {
                     println!("Invalid frame: {:?}", &frame.to_vec());
@@ -126,7 +144,7 @@ fn write_to_uart(
     frame: &mut protocol::DataFrame,
     times: usize,
 ) -> Result<(), Box<dyn Error>> {
-    for i in 0..times {
+    for _ in 0..times {
         let bytes_written_count = uart.write(frame)?;
 
         if bytes_written_count != DATA_FRAME_SIZE {
@@ -138,9 +156,9 @@ fn write_to_uart(
 
         // It takes a bit over one millisecond to transfer each byte
         // (Blocking doesn't seem to work)
-        // So we have to sleep for at least 7 and a bit milliseconds
+        // So we have to sleep for at least the length of the data frame (plus some buffer)
         // to avoid sending overlapping frames.
-        thread::sleep(Duration::from_millis(8));
+        thread::sleep(Duration::from_millis((DATA_FRAME_SIZE + 1) as u64));
     }
 
     Ok(())
@@ -148,16 +166,18 @@ fn write_to_uart(
 
 #[cfg(target_arch = "arm")]
 pub fn write_to_panel(message: DeskToPanelMessage, times: usize) -> Result<(), Box<dyn Error>> {
-    // println!("Writing {:?} times to panel: {:?}", times, rx_message);
-
-    let mut uart = Uart::with_path(PANEL_UART, 9600, Parity::None, 8, 1)?;
-    write_to_uart(&mut uart, &mut message.as_frame(), times)
+    write_to_uart(
+        &mut UART_PANEL_WRITE.lock().unwrap(),
+        &mut message.as_frame(),
+        times,
+    )
 }
 
 #[cfg(target_arch = "arm")]
 pub fn write_to_desk(message: PanelToDeskMessage, times: usize) -> Result<(), Box<dyn Error>> {
-    // println!("Writing {:?} times to desk: {:?}", times, tx_message);
-
-    let mut uart = Uart::with_path(DESK_UART, 9600, Parity::None, 8, 1)?;
-    write_to_uart(&mut uart, &mut message.as_frame(), times)
+    write_to_uart(
+        &mut UART_DESK_WRITE.lock().unwrap(),
+        &mut message.as_frame(),
+        times,
+    )
 }
