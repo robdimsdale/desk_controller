@@ -50,7 +50,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
     spawn(move || loop {
         panel_to_desk_tx
             .send(os::read_panel().expect("Failed to read from panel"))
-            .expect("Failed to send on desk_to_panel_tx");
+            .expect("Failed to send on panel_to_desk_tx");
     });
 
     spawn(move || loop {
@@ -82,12 +82,6 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
                                     message.as_frame()
                                 );
                             }
-
-                            println!(
-                                "desk-to-panel height message: {:?} - {:?}",
-                                message,
-                                message.as_frame()
-                            );
                         }
                         _ => {
                             println!(
@@ -98,7 +92,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
                         }
                     }
 
-                    os::write_to_panel(message, 1).expect("Failed to write to panel");
+                    os::write_to_panel(message,).expect("Failed to write to panel");
                 }
             },
         }
@@ -130,7 +124,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
                         },
                     }
 
-                    os::write_to_desk(message, 1).expect("failed to write to desk");
+                    os::write_to_desk(message).expect("failed to write to desk");
                 }
             },
         }

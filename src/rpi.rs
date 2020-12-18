@@ -102,14 +102,11 @@ fn read_uart(uart: &mut Uart) -> Result<(Option<protocol::DataFrame>, usize), Bo
         if uart.read(&mut buffer)? > 0 {
             let b = buffer[0];
 
-            // println!("byte: {:?}, frame_index: {:?}", b, frame_index);
-
             frame[frame_index] = b;
 
             if frame_index == 0 {
                 if !protocol::is_start_byte(b) {
                     dropped_byte_count += 1;
-                    // println!("Not starting byte: {:?} - dropping", b);
                     continue;
                 }
             }
@@ -117,11 +114,6 @@ fn read_uart(uart: &mut Uart) -> Result<(Option<protocol::DataFrame>, usize), Bo
             if frame_index == DATA_FRAME_SIZE - 1 {
                 // println!("Validating frame: {:?}", &frame.to_vec());
                 if protocol::validate_frame(&frame.to_vec()) {
-                    // println!(
-                    //     "Returning valid frame: {:?} - dropped byte count: {:?}",
-                    //     &frame.to_vec(),
-                    //     dropped_byte_count
-                    // );
                     return Ok((Some(frame.to_vec()), dropped_byte_count));
                 } else {
                     println!("Invalid frame: {:?}", &frame.to_vec());
@@ -139,45 +131,38 @@ fn read_uart(uart: &mut Uart) -> Result<(Option<protocol::DataFrame>, usize), Bo
 }
 
 #[cfg(target_arch = "arm")]
-fn write_to_uart(
-    uart: &mut Uart,
-    frame: &mut protocol::DataFrame,
-    times: usize,
-) -> Result<(), Box<dyn Error>> {
-    for _ in 0..times {
-        let bytes_written_count = uart.write(frame)?;
+fn write_to_uart(uart: &mut Uart, frame: &mut protocol::DataFrame) -> Result<(), Box<dyn Error>> {
+    let bytes_written_count = uart.write(frame)?;
 
-        if bytes_written_count != DATA_FRAME_SIZE {
-            println!(
-                "Wrote {:?} bytes - Expected to write: {:?}",
-                bytes_written_count, DATA_FRAME_SIZE
-            );
-        }
-
-        // It takes a bit over one millisecond to transfer each byte
-        // (Blocking doesn't seem to work)
-        // So we have to sleep for at least the length of the data frame (plus some buffer)
-        // to avoid sending overlapping frames.
-        thread::sleep(Duration::from_millis((DATA_FRAME_SIZE + 1) as u64));
+    if bytes_written_count != DATA_FRAME_SIZE {
+        println!(
+            "Wrote {:?} bytes - Expected to write: {:?}",
+            bytes_written_count, DATA_FRAME_SIZE
+        );
     }
+
+    // It takes a bit over one millisecond to transfer each byte
+    // (Blocking doesn't seem to work)
+    // So we have to sleep for at least the length of the data frame (plus some buffer)
+    // to avoid sending overlapping frames.
+    // TODO: can we get blocking writes to work?
+    thread::sleep(Duration::from_millis((DATA_FRAME_SIZE + 1) as u64));
 
     Ok(())
 }
 
 #[cfg(target_arch = "arm")]
-pub fn write_to_panel(message: DeskToPanelMessage, times: usize) -> Result<(), Box<dyn Error>> {
+pub fn write_to_panel(message: DeskToPanelMessage) -> Result<(), Box<dyn Error>> {
     write_to_uart(
         &mut UART_PANEL_WRITE.lock().unwrap(),
         &mut message.as_frame(),
-        times,
     )
 }
 
 #[cfg(target_arch = "arm")]
-pub fn write_to_desk(message: PanelToDeskMessage, times: usize) -> Result<(), Box<dyn Error>> {
+pub fn write_to_desk(message: PanelToDeskMessage) -> Result<(), Box<dyn Error>> {
     write_to_uart(
         &mut UART_DESK_WRITE.lock().unwrap(),
         &mut message.as_frame(),
-        times,
     )
 }

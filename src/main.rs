@@ -35,10 +35,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (ctl_tx, ctl_rx) = unbounded::<bool>();
 
     ctrlc::set_handler(move || {
-        println!("received Ctrl+C!");
+        println!("received kill signal");
         rust_pi::shutdown().expect("Failed to shutdown");
 
         ctl_tx.send(true).expect("Failed to send shutdown signal");
+        // TODO: wait for acknowledgement from run loops
 
         std::process::exit(0);
     })

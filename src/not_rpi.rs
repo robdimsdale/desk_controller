@@ -24,18 +24,10 @@ pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error
     Ok((Some(PanelToDeskMessage::Three(121.0)), 0))
 }
 
-pub fn write_to_panel(message: DeskToPanelMessage, times: usize) -> Result<(), Box<dyn Error>> {
-    // println!(
-    //     "Not actually writing {:?} times to panel: {:?}",
-    //     times, message
-    // );
+pub fn write_to_panel(message: DeskToPanelMessage) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn write_to_desk(message: PanelToDeskMessage, times: usize) -> Result<(), Box<dyn Error>> {
-    // println!(
-    //     "Not actually writing {:?} times to desk: {:?}",
-    //     times, message
-    // );
+pub fn write_to_desk(message: PanelToDeskMessage) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
