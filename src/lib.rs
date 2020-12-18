@@ -16,6 +16,9 @@ use crossbeam_channel::{select, unbounded};
 use std::error::Error;
 use std::sync::Mutex;
 use std::thread::spawn;
+use std::time::Duration;
+
+const PANEL_KEY_RESET_TIMEOUT: Duration = Duration::from_secs(1);
 
 lazy_static! {
     static ref CURRENT_HEIGHT: Mutex<f32> = Mutex::new(0.0);
@@ -125,6 +128,13 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
                     }
 
                     os::write_to_desk(message).expect("failed to write to desk");
+                }
+            },
+            default(PANEL_KEY_RESET_TIMEOUT) => {
+                let mut current_panel_key = CURRENT_PANEL_KEY.lock().unwrap();
+                if (*current_panel_key).is_some(){
+                    *current_panel_key = None;
+                    println!("No panel key received in {:?} - resetting to None",PANEL_KEY_RESET_TIMEOUT);
                 }
             },
         }
