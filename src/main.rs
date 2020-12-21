@@ -1,6 +1,7 @@
 #![feature(decl_macro)]
 
 use crossbeam_channel::unbounded;
+use rocket::response::status::BadRequest;
 use rocket::*;
 use rust_pi::*;
 use std::error::Error;
@@ -11,8 +12,9 @@ fn index() -> String {
     let (desk_found_frames, desk_dropped_bytes) = rust_pi::desk_frame_counts();
     let (panel_found_frames, panel_dropped_bytes) = rust_pi::panel_frame_counts();
     format!(
-        "Current Height: {:?} cm\nCurrent Panel Key: {:?}\nDesk - frames found: {:?}, bytes dropped: {:?} ({:?}%)\nPanel - frames found: {:?}, bytes dropped: {:?} ({:?}%)",
+        "Current Height: {:?} cm\nTarget Height: {:?} cm\nCurrent Panel Key: {:?}\nDesk - frames found: {:?}, bytes dropped: {:?} ({:?}%)\nPanel - frames found: {:?}, bytes dropped: {:?} ({:?}%)",
         rust_pi::current_height(),
+        rust_pi::target_height(),
         rust_pi::current_panel_key(),
         desk_found_frames,
         desk_dropped_bytes,
@@ -24,8 +26,8 @@ fn index() -> String {
 }
 
 #[get("/move_desk/<target_height>")]
-fn move_desk(target_height: f32) -> () {
-    rust_pi::move_to_height(target_height).unwrap();
+fn move_desk(target_height: f32) -> Result<(), BadRequest<String>> {
+    rust_pi::move_to_height(target_height).map_err(|e| BadRequest(Some(e.to_string())))
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

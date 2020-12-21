@@ -20,8 +20,9 @@ pub fn read_desk() -> Result<(Option<DeskToPanelMessage>, usize), Box<dyn Error>
 }
 
 pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error>> {
-    std::thread::sleep(time::Duration::from_secs(2));
+    std::thread::sleep(time::Duration::from_secs(3));
     Ok((Some(PanelToDeskMessage::Three(121.0)), 0))
+    // Ok((None, 0))
 }
 
 pub fn write_to_panel(message: DeskToPanelMessage) -> Result<(), Box<dyn Error>> {

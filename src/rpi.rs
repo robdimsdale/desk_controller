@@ -41,6 +41,8 @@ lazy_static! {
 pub fn initialize() -> Result<(), Box<dyn Error>> {
     println!("Turning on LED at GPIO {}.", GPIO_LED,);
 
+    // TODO: Figure out why the GPIO needs to be set to output mode
+    // by some process external to this application (e.g. wiring-pi)
     let mut pin = Gpio::new()?.get(GPIO_LED)?.into_output();
 
     pin.set_high();
