@@ -6,6 +6,8 @@ use std::error::Error;
 use std::thread::spawn;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
+
     let (ctl_tx, ctl_rx) = unbounded::<bool>();
 
     ctrlc::set_handler(move || {
@@ -25,7 +27,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         rocket::ignite()
             .mount(
                 "/",
-                routes![web::index, web::current_height, web::move_desk],
+                routes![
+                    web::index,
+                    web::current_height,
+                    web::move_desk,
+                    web::clear_target_height
+                ],
             )
             .launch();
     });
@@ -60,6 +67,11 @@ mod web {
     #[get("/move_desk/<target_height>")]
     pub fn move_desk(target_height: f32) -> Result<(), BadRequest<String>> {
         rust_pi::move_to_height(target_height).map_err(|e| BadRequest(Some(e.to_string())))
+    }
+
+    #[get("/clear_target_height")]
+    pub fn clear_target_height() {
+        rust_pi::clear_target_height()
     }
 
     #[get("/current_height")]

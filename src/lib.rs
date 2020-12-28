@@ -13,6 +13,7 @@ extern crate lazy_static;
 pub use crate::protocol::DATA_FRAME_SIZE;
 use crate::protocol::{DeskToPanelMessage, PanelToDeskMessage};
 use crossbeam_channel::{select, unbounded};
+use log::{debug, info};
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
@@ -112,20 +113,20 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
 
             select! {
                 recv(c3_rx) -> msg => {
-                    println!("Run: received val on c3_rx: {:?}. Shutting down.", msg);
+                    debug!("Run: received val on c3_rx: {:?}. Shutting down.", msg);
                     return
                     // TODO: shutdown
                 },
                 recv(interrupt_rx) -> _ =>{
-                    println!("Run: received interrupt");
+                    debug!("Run: received interrupt");
                 },
                 default(INTERRUPT_TIMEOUT_DURATION) => {
-                    println!("Run: no interrupt received in {:?}", INTERRUPT_TIMEOUT_DURATION);
+                    debug!("Run: no interrupt received in {:?}", INTERRUPT_TIMEOUT_DURATION);
                 }
             };
 
             let current_height = current_height();
-            println!("Run: current height: {:?}", current_height);
+            debug!("Run: current height: {:?}", current_height);
 
             // TODO: handle situation(s) where desk isn't moving even though we're sending it a key
             // - one situation is if we recently pressed another key
@@ -135,24 +136,29 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
             let panel_key = current_panel_key();
             let target_height = target_height();
 
+            debug!(
+                "Run: Current height: {:?}. Target height: {:?}. Panel key: {:?}",
+                current_height, target_height, panel_key
+            );
+
             let maybe_message_info =
                 calculate_panel_to_desk_message(panel_key, target_height, current_height)
                     .expect("failed to calculate panel to desk message");
 
             if let Some((message, times, reset_target_height)) = maybe_message_info {
-                println!("Run: writing {:?} message {:?} times.\n- current_height: {:?}\n- target height: {:?}\n- panel key: {:?}",
-                message, times,current_height,target_height,panel_key);
+                debug!("Run: writing {:?} message {:?} times.", message, times);
 
                 for _ in 0..times {
                     os::write_to_desk(message).expect("failed to write to desk");
                 }
 
                 if reset_target_height {
-                    println!("Run: resetting target height to None");
+                    info!("At target height of: {:?}.", target_height);
+                    debug!("Run: resetting target height to None");
                     set_target_height(None);
                 } else {
                     if target_height.is_some() {
-                        println!("Run: resetting target_height: {:?}", target_height);
+                        debug!("Run: not yet at target_height - sending interrupt");
                         interrupt_tx
                             .send(())
                             .expect("failed to send on INTERRUPT_TX_RX");
@@ -167,7 +173,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
     spawn(move || loop {
         select! {
         recv(c1_rx) -> _=> {
-            println!("Received shutdown signal - exiting run (desk->panel) loop");
+            debug!("Received shutdown signal - exiting run (desk->panel) loop");
             return
         },
         default => {
@@ -183,7 +189,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
                         set_current_height(h);
 
                         if h < MIN_DESK_HEIGHT_CM || h > MAX_DESK_HEIGHT_CM {
-                            println!(
+                            debug!(
                                 "received abnormal height from desk: {:?} - {:?}",
                                 h,
                                 message.as_frame()
@@ -191,7 +197,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
                         }
                     }
                     _ => {
-                        println!(
+                        debug!(
                             "received other desk-to-panel message: {:?} - {:?}",
                             message,
                             message.as_frame()
@@ -208,7 +214,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
     spawn(move || loop {
         select! {
             recv(c4_rx) -> _=> {
-                println!("Received shutdown signal (c4_rx) - exiting run (desk->panel) loop");
+                debug!("Received shutdown signal (c4_rx) - exiting run (desk->panel) loop");
                 return
             },
             recv(write_to_panel_rx) -> msg =>{
@@ -230,7 +236,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
     spawn(move || loop {
         select! {
             recv(c2_rx) -> _=> {
-                println!("Received shutdown signal - exiting run (panel->desk) loop");
+                debug!("Received shutdown signal - exiting run (panel->desk) loop");
                 return;
             },
             recv(panel_to_desk_rx) -> msg => {
@@ -244,7 +250,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
                     match message{
                         PanelToDeskMessage::NoKey => {}
                         _ => {
-                            println!(
+                            debug!(
                                 "panel-to-desk message: {:?} - {:?}",
                                 message,
                                 message.as_frame()
@@ -258,7 +264,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
             default(PANEL_KEY_RESET_TIMEOUT) => {
                 let current_panel_key = current_panel_key();
                 if current_panel_key.is_some(){
-                    println!("No panel key received in {:?} - resetting to None (from: {:?})",PANEL_KEY_RESET_TIMEOUT,current_panel_key);
+                    debug!("No panel key received in {:?} - resetting to None (from: {:?})",PANEL_KEY_RESET_TIMEOUT,current_panel_key);
                     set_current_panel_key(None);
                 }
             },
@@ -275,8 +281,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
 }
 
 pub fn move_to_height(height_in_cm: f32) -> Result<(), InvalidHeightError> {
-    // TODO: validate that height is in range (65.0 to 129.5)
-    // TODO: validate that height is a multiple of 0.5
+    info!("Moving to height: {:?}", height_in_cm);
 
     if height_in_cm < MIN_DESK_HEIGHT_CM || height_in_cm > MAX_DESK_HEIGHT_CM {
         return Err(InvalidHeightError::new_out_of_range(height_in_cm));
@@ -291,6 +296,11 @@ pub fn move_to_height(height_in_cm: f32) -> Result<(), InvalidHeightError> {
     set_target_height(Some(height_in_cm));
 
     Ok(())
+}
+
+pub fn clear_target_height() {
+    info!("Clearing target height");
+    set_target_height(None);
 }
 
 pub fn current_height() -> f32 {
