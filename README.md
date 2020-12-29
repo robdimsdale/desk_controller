@@ -1,6 +1,6 @@
-# Rust PI
+# Desk Controller
 
-Read and display the UART (serial) data.
+Control a Vari standing desk from a Raspberry Pi
 
 Usage:
 

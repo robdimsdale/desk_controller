@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     ctrlc::set_handler(move || {
         println!("received kill signal");
-        rust_pi::shutdown().expect("Failed to shutdown");
+        desk_controller::shutdown().expect("Failed to shutdown");
 
         ctl_tx.send(true).expect("Failed to send shutdown signal");
         // TODO: wait for acknowledgement from run loops
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     })
     .expect("Error setting Ctrl-C handler");
 
-    rust_pi::initialize()?;
+    desk_controller::initialize()?;
 
     spawn(move || {
         rocket::ignite()
@@ -37,24 +37,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             .launch();
     });
 
-    rust_pi::run(ctl_rx)
+    desk_controller::run(ctl_rx)
 }
 
 mod web {
+    use desk_controller::DATA_FRAME_SIZE;
     use rocket::response::status::BadRequest;
     use rocket::*;
-    use rust_pi::DATA_FRAME_SIZE;
 
     #[get("/")]
     pub fn index() -> String {
-        let (desk_found_frames, desk_dropped_bytes) = rust_pi::desk_frame_counts();
-        let (panel_found_frames, panel_dropped_bytes) = rust_pi::panel_frame_counts();
+        let (desk_found_frames, desk_dropped_bytes) = desk_controller::desk_frame_counts();
+        let (panel_found_frames, panel_dropped_bytes) = desk_controller::panel_frame_counts();
 
         format!(
             "Current Height: {:?} cm\nTarget Height: {:?} cm\nCurrent Panel Key: {:?}\nDesk - frames found: {:?}, bytes dropped: {:?} ({:?}%)\nPanel - frames found: {:?}, bytes dropped: {:?} ({:?}%)",
-            rust_pi::current_height(),
-            rust_pi::target_height(),
-            rust_pi::current_panel_key(),
+            desk_controller::current_height(),
+            desk_controller::target_height(),
+            desk_controller::current_panel_key(),
             desk_found_frames,
             desk_dropped_bytes,
             100.0*desk_dropped_bytes as f32 / (desk_found_frames*DATA_FRAME_SIZE + desk_dropped_bytes) as f32,
@@ -66,16 +66,16 @@ mod web {
 
     #[get("/move_desk/<target_height>")]
     pub fn move_desk(target_height: f32) -> Result<(), BadRequest<String>> {
-        rust_pi::move_to_height(target_height).map_err(|e| BadRequest(Some(e.to_string())))
+        desk_controller::move_to_height(target_height).map_err(|e| BadRequest(Some(e.to_string())))
     }
 
     #[get("/clear_target_height")]
     pub fn clear_target_height() {
-        rust_pi::clear_target_height()
+        desk_controller::clear_target_height()
     }
 
     #[get("/current_height")]
     pub fn current_height() -> String {
-        format!("{}", rust_pi::current_height())
+        format!("{}", desk_controller::current_height())
     }
 }

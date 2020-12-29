@@ -228,6 +228,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "desk_controller"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "ctrlc",
+ "env_logger",
+ "lazy_static",
+ "log 0.4.11",
+ "rand",
+ "rocket",
+ "rppal",
+]
+
+[[package]]
 name = "devise"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -682,20 +696,6 @@ checksum = "137dbba1fb867daa27cda4c3cd6a11bca5bb5a1551f034cf9319b994846ddbe1"
 dependencies = [
  "lazy_static",
  "libc",
-]
-
-[[package]]
-name = "rust_pi"
-version = "0.1.0"
-dependencies = [
- "crossbeam-channel",
- "ctrlc",
- "env_logger",
- "lazy_static",
- "log 0.4.11",
- "rand",
- "rocket",
- "rppal",
 ]
 
 [[package]]
