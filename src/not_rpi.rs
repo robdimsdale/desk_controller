@@ -25,10 +25,10 @@ pub fn read_panel() -> Result<(Option<PanelToDeskMessage>, usize), Box<dyn Error
     // Ok((None, 0))
 }
 
-pub fn write_to_panel(message: DeskToPanelMessage) -> Result<(), Box<dyn Error>> {
+pub fn write_to_panel(_: DeskToPanelMessage) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn write_to_desk(message: PanelToDeskMessage) -> Result<(), Box<dyn Error>> {
+pub fn write_to_desk(_: PanelToDeskMessage) -> Result<(), Box<dyn Error>> {
     Ok(())
 }

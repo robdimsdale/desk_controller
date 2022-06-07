@@ -108,7 +108,7 @@ pub fn validate_frame(frame: &DataFrame) -> bool {
         return false;
     }
 
-    return true;
+    true
 }
 
 fn build_frame(b2: u8, b3: u8, b4: u8) -> DataFrame {

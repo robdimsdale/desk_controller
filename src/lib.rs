@@ -37,14 +37,14 @@ pub struct InvalidHeightError {
 impl InvalidHeightError {
     fn new_out_of_range(height: f32) -> InvalidHeightError {
         InvalidHeightError {
-            height: height,
+            height,
             out_of_range: true,
             not_multiple_of_zero_point_five: false,
         }
     }
     fn new_not_multiple_of_zero_point_five(height: f32) -> InvalidHeightError {
         InvalidHeightError {
-            height: height,
+            height,
             out_of_range: false,
             not_multiple_of_zero_point_five: true,
         }
@@ -156,13 +156,11 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
                     info!("At target height of: {:?}.", target_height);
                     debug!("Run: resetting target height to None");
                     set_target_height(None);
-                } else {
-                    if target_height.is_some() {
-                        debug!("Run: not yet at target_height - sending interrupt");
-                        interrupt_tx
-                            .send(())
-                            .expect("failed to send on INTERRUPT_TX_RX");
-                    }
+                } else if target_height.is_some() {
+                    debug!("Run: not yet at target_height - sending interrupt");
+                    interrupt_tx
+                        .send(())
+                        .expect("failed to send on INTERRUPT_TX_RX");
                 }
             }
         }
@@ -188,7 +186,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
                     DeskToPanelMessage::Height(h) => {
                         set_current_height(h);
 
-                        if h < MIN_DESK_HEIGHT_CM || h > MAX_DESK_HEIGHT_CM {
+                        if !(MIN_DESK_HEIGHT_CM..=MAX_DESK_HEIGHT_CM).contains(&h){
                             debug!(
                                 "received abnormal height from desk: {:?} - {:?}",
                                 h,
@@ -283,7 +281,7 @@ pub fn run(ctl_rx: crossbeam_channel::Receiver<bool>) -> Result<(), Box<dyn Erro
 pub fn move_to_height(height_in_cm: f32) -> Result<(), InvalidHeightError> {
     info!("Moving to height: {:?}", height_in_cm);
 
-    if height_in_cm < MIN_DESK_HEIGHT_CM || height_in_cm > MAX_DESK_HEIGHT_CM {
+    if !(MIN_DESK_HEIGHT_CM..=MAX_DESK_HEIGHT_CM).contains(&height_in_cm) {
         return Err(InvalidHeightError::new_out_of_range(height_in_cm));
     }
 
