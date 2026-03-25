@@ -1,11 +1,9 @@
-#![feature(decl_macro)]
-
 use crossbeam_channel::unbounded;
 use rocket::*;
-use std::error::Error;
 use std::thread::spawn;
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[rocket::main]
+async fn main() -> Result<(), rocket::Error> {
     env_logger::init();
 
     let (ctl_tx, ctl_rx) = unbounded::<bool>();
@@ -21,23 +19,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     })
     .expect("Error setting Ctrl-C handler");
 
-    desk_controller::initialize()?;
+    desk_controller::initialize().expect("Failed to initialize");
 
     spawn(move || {
-        rocket::ignite()
-            .mount(
-                "/",
-                routes![
-                    web::index,
-                    web::current_height,
-                    web::move_desk,
-                    web::clear_target_height
-                ],
-            )
-            .launch();
+        desk_controller::run(ctl_rx).expect("run failed");
     });
 
-    desk_controller::run(ctl_rx)
+    rocket::build()
+        .mount(
+            "/",
+            routes![
+                web::index,
+                web::current_height,
+                web::move_desk,
+                web::clear_target_height
+            ],
+        )
+        .launch()
+        .await?;
+
+    Ok(())
 }
 
 mod web {
@@ -66,7 +67,7 @@ mod web {
 
     #[get("/move_desk/<target_height>")]
     pub fn move_desk(target_height: f32) -> Result<(), BadRequest<String>> {
-        desk_controller::move_to_height(target_height).map_err(|e| BadRequest(Some(e.to_string())))
+        desk_controller::move_to_height(target_height).map_err(|e| BadRequest(e.to_string()))
     }
 
     #[get("/clear_target_height")]
