@@ -1,19 +1,19 @@
 [package]
-name = "desk_controller"
-version = "0.1.0"
-authors = ["Rob Dimsdale-Zucker <robert.dimsdale@gmail.com>"]
-edition = "2021"
+  name = "desk_controller"
+  version = "0.1.0"
+  authors = ["Rob Dimsdale-Zucker <robert.dimsdale@gmail.com>"]
+  edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+  # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crossbeam-channel = "0.5"
-ctrlc = { version = "3.5", features = ["termination"] }
-env_logger = "0.11"
-lazy_static = "1.5"
-log = "0.4"
-rand = "0.9"
-rocket = "0.5"
+  crossbeam-channel = "0.5"
+  ctrlc = { version = "3.5", features = ["termination"] }
+  env_logger = "0.11"
+  lazy_static = "1.5"
+  log = "0.4"
+  rand = "0.10"
+  rocket = "0.5"
 
 [target.'cfg(target_arch = "arm")'.dependencies]
-rppal = "0.22"
+  rppal = "0.22"

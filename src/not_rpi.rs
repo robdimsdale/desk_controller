@@ -1,5 +1,5 @@
 use crate::protocol::{DeskToPanelMessage, PanelToDeskMessage};
-use rand::Rng as _;
+use rand::RngExt as _;
 use std::error::Error;
 use std::time;
 
